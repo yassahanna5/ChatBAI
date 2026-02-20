@@ -1,11 +1,11 @@
 [build]
-  command = "npm ci && npm run build"
+  command = "npm install && npm run build"
   publish = "dist"
   base = "/"
 
 [build.environment]
-  NODE_VERSION = "18"
-  NPM_VERSION = "9"
+  NODE_VERSION = "20"
+  NPM_VERSION = "10"
   NPM_FLAGS = "--legacy-peer-deps"
 
 # ========== إعدادات التوجيه لـ React Router ==========
@@ -24,7 +24,7 @@
     Referrer-Policy = "strict-origin-when-cross-origin"
     Content-Language = "ar, en"
 
-# ========== تحسين التخزين المؤقت للملفات الثابتة ==========
+# ========== تحسين التخزين المؤقت ==========
 [[headers]]
   for = "/assets/*"
   [headers.values]
@@ -94,7 +94,7 @@
   command = "npm run dev"
   environment = { NODE_ENV = "development" }
 
-# ========== إعدادات النشر والتحسين ==========
+# ========== إعدادات النشر ==========
 [build.processing]
   skip_processing = false
 
