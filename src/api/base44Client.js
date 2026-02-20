@@ -4,14 +4,21 @@ import { appParams } from '@/lib/app-params';
 
 const { appId, token, functionsVersion, appBaseUrl } = appParams;
 
+// استخدام المتغيرات البيئية مع fallback
+const BASE_URL = import.meta.env.VITE_BASE44_APP_BASE_URL || appBaseUrl || 'https://app.base44.com';
+const APP_ID = import.meta.env.VITE_BASE44_APP_ID || appId || '698092d9355e78e06e2f8424';
+const API_KEY = '46d61c5092864feab81ac3a4d2fe3261'; // ثابت
+
+console.log('Base44 Config:', { BASE_URL, APP_ID }); // للتأكد
+
 // إنشاء client مع المصادقة المطلوبة
 export const base44 = createClient({
-  appId,
+  appId: APP_ID,
   token,
   functionsVersion,
   serverUrl: '',
   requiresAuth: false,
-  appBaseUrl
+  appBaseUrl: BASE_URL
 });
 
 // ==================== نظام المصادقة ====================
@@ -87,10 +94,13 @@ export const fetchPlans = async (filters = {}) => {
   try {
     console.log('Fetching plans with filters:', filters);
     
-    const response = await fetch('https://app.base44.com/api/apps/698092d9355e78e06e2f8424/entities/Plan', {
+    const url = `${BASE_URL}/api/apps/${APP_ID}/entities/Plan`;
+    console.log('Fetching from:', url);
+    
+    const response = await fetch(url, {
       method: 'GET',
       headers: {
-        'api_key': '46d61c5092864feab81ac3a4d2fe3261',
+        'api_key': API_KEY,
         'Content-Type': 'application/json'
       }
     });
@@ -119,10 +129,12 @@ export const fetchPlans = async (filters = {}) => {
 // جلب خطة محددة بالـ ID
 export const fetchPlanById = async (planId) => {
   try {
-    const response = await fetch(`https://app.base44.com/api/apps/698092d9355e78e06e2f8424/entities/Plan/${planId}`, {
+    const url = `${BASE_URL}/api/apps/${APP_ID}/entities/Plan/${planId}`;
+    
+    const response = await fetch(url, {
       method: 'GET',
       headers: {
-        'api_key': '46d61c5092864feab81ac3a4d2fe3261',
+        'api_key': API_KEY,
         'Content-Type': 'application/json'
       }
     });
@@ -146,10 +158,13 @@ export const fetchSubscriptions = async (filters = {}) => {
   try {
     console.log('Fetching subscriptions with filters:', filters);
     
-    const response = await fetch('https://app.base44.com/api/apps/698092d9355e78e06e2f8424/entities/Subscription', {
+    const url = `${BASE_URL}/api/apps/${APP_ID}/entities/Subscription`;
+    console.log('Fetching from:', url);
+    
+    const response = await fetch(url, {
       method: 'GET',
       headers: {
-        'api_key': '46d61c5092864feab81ac3a4d2fe3261',
+        'api_key': API_KEY,
         'Content-Type': 'application/json'
       }
     });
@@ -183,10 +198,12 @@ export const createSubscription = async (subscriptionData) => {
   try {
     console.log('Creating subscription:', subscriptionData);
     
-    const response = await fetch('https://app.base44.com/api/apps/698092d9355e78e06e2f8424/entities/Subscription', {
+    const url = `${BASE_URL}/api/apps/${APP_ID}/entities/Subscription`;
+    
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
-        'api_key': '46d61c5092864feab81ac3a4d2fe3261',
+        'api_key': API_KEY,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(subscriptionData)
@@ -211,10 +228,12 @@ export const updateSubscription = async (subscriptionId, updateData) => {
   try {
     console.log('Updating subscription:', subscriptionId, updateData);
     
-    const response = await fetch(`https://app.base44.com/api/apps/698092d9355e78e06e2f8424/entities/Subscription/${subscriptionId}`, {
+    const url = `${BASE_URL}/api/apps/${APP_ID}/entities/Subscription/${subscriptionId}`;
+    
+    const response = await fetch(url, {
       method: 'PUT',
       headers: {
-        'api_key': '46d61c5092864feab81ac3a4d2fe3261',
+        'api_key': API_KEY,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(updateData)
@@ -237,10 +256,12 @@ export const updateSubscription = async (subscriptionId, updateData) => {
 // حذف اشتراك
 export const deleteSubscription = async (subscriptionId) => {
   try {
-    const response = await fetch(`https://app.base44.com/api/apps/698092d9355e78e06e2f8424/entities/Subscription/${subscriptionId}`, {
+    const url = `${BASE_URL}/api/apps/${APP_ID}/entities/Subscription/${subscriptionId}`;
+    
+    const response = await fetch(url, {
       method: 'DELETE',
       headers: {
-        'api_key': '46d61c5092864feab81ac3a4d2fe3261',
+        'api_key': API_KEY,
         'Content-Type': 'application/json'
       }
     });
@@ -263,10 +284,12 @@ export const deleteSubscription = async (subscriptionId) => {
 // إنشاء إشعار
 export const createNotification = async (notificationData) => {
   try {
-    const response = await fetch('https://app.base44.com/api/apps/698092d9355e78e06e2f8424/entities/Notification', {
+    const url = `${BASE_URL}/api/apps/${APP_ID}/entities/Notification`;
+    
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
-        'api_key': '46d61c5092864feab81ac3a4d2fe3261',
+        'api_key': API_KEY,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(notificationData)
@@ -289,10 +312,12 @@ export const createNotification = async (notificationData) => {
 // تسجيل نشاط
 export const createActivityLog = async (logData) => {
   try {
-    const response = await fetch('https://app.base44.com/api/apps/698092d9355e78e06e2f8424/entities/ActivityLog', {
+    const url = `${BASE_URL}/api/apps/${APP_ID}/entities/ActivityLog`;
+    
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
-        'api_key': '46d61c5092864feab81ac3a4d2fe3261',
+        'api_key': API_KEY,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(logData)
