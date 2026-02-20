@@ -7,6 +7,7 @@
   ],
   "env": {
     "VITE_BASE44_APP_BASE_URL": "https://chatbai.base44.app",
-    "VITE_BASE44_APP_ID": "698092d9355e78e06e2f8424"
+    "VITE_BASE44_APP_ID": "698092d9355e78e06e2f8424",
+    "VITE_APP_URL": "chat-bai-ka16.vercel.app"
   }
 }
