@@ -1,0 +1,21 @@
+{
+  "name": "ChatBAI APP",
+  "short_name": "ChatBAI",
+  "description": "ChatBAI is an AI-Business-Assistant that helps you manage your business efficiently. It provides insights, automates tasks, and offers personalized recommendations to enhance your business operations , ",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1995AD",
+  "icons": [
+    {
+      "src": "/assets/images/logo.jpg",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "/assets/images/logo.jpg",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}
