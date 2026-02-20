@@ -7,9 +7,27 @@ const { appId, token, functionsVersion, appBaseUrl } = appParams;
 // استخدام المتغيرات البيئية مع fallback
 const BASE_URL = import.meta.env.VITE_BASE44_APP_BASE_URL || appBaseUrl || 'https://app.base44.com';
 const APP_ID = import.meta.env.VITE_BASE44_APP_ID || appId || '698092d9355e78e06e2f8424';
-const API_KEY = '46d61c5092864feab81ac3a4d2fe3261'; // ثابت
+const API_KEY = '46d61c5092864feab81ac3a4d2fe3261';
 
-console.log('Base44 Config:', { BASE_URL, APP_ID }); // للتأكد
+// تحديد الـ redirect URL المناسب حسب البيئة
+const getRedirectUrl = () => {
+  // في بيئة Vercel
+  if (import.meta.env.VERCEL_URL) {
+    return `https://${import.meta.env.VERCEL_URL}`;
+  }
+  // في بيئة Netlify
+  if (import.meta.env.NETLIFY) {
+    return import.meta.env.URL || `https://${import.meta.env.NETLIFY_URL}`;
+  }
+  // في بيئة التطوير المحلي
+  if (import.meta.env.DEV) {
+    return 'http://localhost:5173';
+  }
+  // الرجوع إلى المتغير البيئي أو domain افتراضي
+  return import.meta.env.VITE_APP_URL || window.location.origin;
+};
+
+console.log('Base44 Config:', { BASE_URL, APP_ID, redirectUrl: getRedirectUrl() });
 
 // إنشاء client مع المصادقة المطلوبة
 export const base44 = createClient({
@@ -18,7 +36,8 @@ export const base44 = createClient({
   functionsVersion,
   serverUrl: '',
   requiresAuth: false,
-  appBaseUrl: BASE_URL
+  appBaseUrl: BASE_URL,
+  redirectUrl: getRedirectUrl() // إضافة redirect URL
 });
 
 // ==================== نظام المصادقة ====================
