@@ -11,23 +11,28 @@ const API_KEY = '46d61c5092864feab81ac3a4d2fe3261';
 
 // تحديد الـ redirect URL المناسب حسب البيئة
 const getRedirectUrl = () => {
-  // في بيئة Vercel
-  if (import.meta.env.VERCEL_URL) {
-    return `https://${import.meta.env.VERCEL_URL}`;
+  // في بيئة Vercel - استخدام URL ثابت للحل المؤقت
+  if (window.location.hostname.includes('vercel.app')) {
+    return 'chat-bai-ka16.vercel.app';
   }
   // في بيئة Netlify
-  if (import.meta.env.NETLIFY) {
-    return import.meta.env.URL || `https://${import.meta.env.NETLIFY_URL}`;
+  if (window.location.hostname.includes('netlify.app')) {
+    return window.location.origin;
   }
   // في بيئة التطوير المحلي
-  if (import.meta.env.DEV) {
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
     return 'http://localhost:5173';
   }
   // الرجوع إلى المتغير البيئي أو domain افتراضي
   return import.meta.env.VITE_APP_URL || window.location.origin;
 };
 
-console.log('Base44 Config:', { BASE_URL, APP_ID, redirectUrl: getRedirectUrl() });
+console.log('Base44 Config:', { 
+  BASE_URL, 
+  APP_ID, 
+  redirectUrl: getRedirectUrl(),
+  hostname: window.location.hostname 
+});
 
 // إنشاء client مع المصادقة المطلوبة
 export const base44 = createClient({
@@ -37,7 +42,7 @@ export const base44 = createClient({
   serverUrl: '',
   requiresAuth: false,
   appBaseUrl: BASE_URL,
-  redirectUrl: getRedirectUrl() // إضافة redirect URL
+  redirectUrl: getRedirectUrl()
 });
 
 // ==================== نظام المصادقة ====================
