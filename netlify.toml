@@ -1,17 +1,20 @@
 [build]
-  command = "npm run build"
+  command = "npm ci && npm run build"
   publish = "dist"
   base = "/"
 
 [build.environment]
   NODE_VERSION = "18"
   NPM_VERSION = "9"
+  NPM_FLAGS = "--legacy-peer-deps"
 
+# ========== إعدادات التوجيه لـ React Router ==========
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
 
+# ========== رؤوس الأمان ==========
 [[headers]]
   for = "/*"
   [headers.values]
@@ -21,6 +24,7 @@
     Referrer-Policy = "strict-origin-when-cross-origin"
     Content-Language = "ar, en"
 
+# ========== تحسين التخزين المؤقت للملفات الثابتة ==========
 [[headers]]
   for = "/assets/*"
   [headers.values]
@@ -61,13 +65,36 @@
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
+[[headers]]
+  for = "/*.woff"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*.woff2"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*.ttf"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# ========== إعدادات البيئة ==========
 [context.production]
+  environment = { NODE_ENV = "production" }
+
+[context.deploy-preview]
+  environment = { NODE_ENV = "production" }
+
+[context.branch-deploy]
   environment = { NODE_ENV = "production" }
 
 [context.dev]
   command = "npm run dev"
   environment = { NODE_ENV = "development" }
 
+# ========== إعدادات النشر والتحسين ==========
 [build.processing]
   skip_processing = false
 
