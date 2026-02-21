@@ -31,11 +31,13 @@ export default function Home() {
           setIsAdmin(true);
         }
         
+        // ✅ تأكد أن notifs مصفوفة قبل استخدام .length
         const notifs = await base44.entities.Notification.filter({ user_email: currentUser.email, is_read: false });
-        setUnreadNotifs(notifs.length);
+        setUnreadNotifs(Array.isArray(notifs) ? notifs.length : 0);
       }
     } catch (error) {
-      // Not authenticated
+      console.error('Auth error:', error);
+      setUnreadNotifs(0);
     }
   };
 
