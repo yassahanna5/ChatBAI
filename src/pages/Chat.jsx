@@ -128,88 +128,87 @@ export default function Chat() {
   }, []);
 
   const loadData = async () => {
-    try {
-      const currentUser = await base44.auth.me();
-      setUser(currentUser);
+  try {
+    const currentUser = await base44.auth.me();
+    setUser(currentUser);
+    
+    // Check for pending registration data
+    const pendingReg = localStorage.getItem('pendingRegistration');
+    if (pendingReg && !currentUser.phone) {
+      const regData = JSON.parse(pendingReg);
       
-      // Check for pending registration data
-      const pendingReg = localStorage.getItem('pendingRegistration');
-      if (pendingReg && !currentUser.phone) {
-        const regData = JSON.parse(pendingReg);
-        
-        await base44.auth.updateMe({
-          phone: regData.personal.phone,
-          gender: regData.personal.gender
+      await base44.auth.updateMe({
+        phone: regData.personal.phone,
+        gender: regData.personal.gender
+      });
+      
+      if (regData.business.business_name) {
+        await base44.entities.BusinessProfile.create({
+          user_email: currentUser.email,
+          ...regData.business
         });
-        
-        if (regData.business.business_name) {
-          await base44.entities.BusinessProfile.create({
-            user_email: currentUser.email,
-            ...regData.business
-          });
-        }
-        
-        localStorage.removeItem('pendingRegistration');
       }
-
-      // Load subscription
-      const subs = await base44.entities.Subscription.filter({ user_email: currentUser.email, status: 'active' });
-      if (subs.length > 0) {
-        setSubscription(subs[0]);
-      } else {
-        if (!currentUser.free_credits_given) {
-          const freeSub = await base44.entities.Subscription.create({
-            user_email: currentUser.email,
-            plan_id: 'free',
-            plan_name: 'Free Trial',
-            credits_total: 10,
-            credits_used: 0,
-            tokens_per_question: 500,
-            status: 'active',
-            amount_paid: 0
-          });
-          setSubscription(freeSub);
-          
-          await base44.auth.updateMe({ free_credits_given: true });
-
-          await base44.entities.Notification.create({
-            user_email: currentUser.email,
-            title_en: 'Welcome!',
-            title_ar: 'مرحباً!',
-            message_en: 'Welcome to our platform! You have received 10 free credits.',
-            message_ar: 'مرحباً بك في منصتنا! لقد حصلت على 10 نقاط مجانية.',
-            type: 'welcome'
-          });
-
-          await base44.entities.ActivityLog.create({
-            user_email: currentUser.email,
-            action: 'login',
-            details: 'First login - free credits given'
-          });
-        }
-      }
-
-      const profiles = await base44.entities.BusinessProfile.filter({ user_email: currentUser.email });
-      if (profiles.length > 0) {
-        setBusinessProfile(profiles[0]);
-      }
-
-      const convs = await base44.entities.Conversation.filter({ user_email: currentUser.email }, '-created_date');
-      setConversations(convs);
-
-      const notifs = await base44.entities.Notification.filter({ user_email: currentUser.email, is_read: false });
-      setNotifications(notifs);
-
-      if (!currentUser.onboarding_completed) {
-        setShowOnboarding(true);
-      }
-
-    } catch (error) {
-      console.error('Error loading data:', error);
-    } finally {
-      setLoading(false);
+      
+      localStorage.removeItem('pendingRegistration');
     }
-  };
+
+    // Load subscription
+    const subs = await base44.entities.Subscription.filter({ user_email: currentUser.email, status: 'active' });
+    setSubscription(Array.isArray(subs) && subs.length > 0 ? subs[0] : null);
+    
+    if (!currentUser.free_credits_given && (!subs || subs.length === 0)) {
+      const freeSub = await base44.entities.Subscription.create({
+        user_email: currentUser.email,
+        plan_id: 'free',
+        plan_name: 'Free Trial',
+        credits_total: 10,
+        credits_used: 0,
+        tokens_per_question: 500,
+        status: 'active',
+        amount_paid: 0
+      });
+      setSubscription(freeSub);
+      
+      await base44.auth.updateMe({ free_credits_given: true });
+
+      await base44.entities.Notification.create({
+        user_email: currentUser.email,
+        title_en: 'Welcome!',
+        title_ar: 'مرحباً!',
+        message_en: 'Welcome to our platform! You have received 10 free credits.',
+        message_ar: 'مرحباً بك في منصتنا! لقد حصلت على 10 نقاط مجانية.',
+        type: 'welcome'
+      });
+
+      await base44.entities.ActivityLog.create({
+        user_email: currentUser.email,
+        action: 'login',
+        details: 'First login - free credits given'
+      });
+    }
+
+    const profiles = await base44.entities.BusinessProfile.filter({ user_email: currentUser.email });
+    setBusinessProfile(Array.isArray(profiles) && profiles.length > 0 ? profiles[0] : null);
+
+    const convs = await base44.entities.Conversation.filter({ user_email: currentUser.email }, '-created_date');
+    setConversations(Array.isArray(convs) ? convs : []);
+
+    const notifs = await base44.entities.Notification.filter({ user_email: currentUser.email, is_read: false });
+    setNotifications(Array.isArray(notifs) ? notifs : []);
+
+    if (!currentUser.onboarding_completed) {
+      setShowOnboarding(true);
+    }
+
+  } catch (error) {
+    console.error('Error loading data:', error);
+    // ✅ تعيين قيم افتراضية في حالة الخطأ
+    setConversations([]);
+    setNotifications([]);
+  } finally {
+    setLoading(false);
+  }
+};
 
   // ==================== دالة OpenRouter المتطورة (تدعم الصور والملفات) ====================
   const invokeOpenRouter = async (model, prompt, files = []) => {
@@ -826,4 +825,5 @@ Respond in ${language === 'ar' ? 'Arabic' : 'English'}.`;
       </div>
     </div>
   );
+
 }
