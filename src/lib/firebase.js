@@ -15,28 +15,49 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
+console.log('🔥 Firebase config:', firebaseConfig);
 const app = initializeApp(firebaseConfig);
+console.log('🔥 Firebase app initialized:', app);
+
 const database = getDatabase(app);
+console.log('🔥 Database URL:', database._repo?.info_?.databaseURL || 'URL not available');
 
 // Reviews functions
 export const reviewsRef = ref(database, 'reviews');
+console.log('🔥 Reviews ref path:', reviewsRef.toString());
 
 export const saveReview = async (reviewData) => {
+  console.log('📤 Attempting to save review to Firebase...');
+  console.log('📤 Review data received:', reviewData);
+  console.log('📤 Reviews ref path:', reviewsRef.toString());
+  
   try {
     const newReviewRef = push(reviewsRef);
-    await set(newReviewRef, {
+    console.log('📤 New review key generated:', newReviewRef.key);
+    
+    const dataToSave = {
       ...reviewData,
       createdAt: new Date().toISOString(),
       is_approved: true
-    });
+    };
+    console.log('📤 Data to save:', dataToSave);
+    
+    await set(newReviewRef, dataToSave);
+    console.log('✅ Review saved successfully! ID:', newReviewRef.key);
+    
     return { success: true, id: newReviewRef.key };
   } catch (error) {
-    console.error('Error saving review to Firebase:', error);
+    console.error('❌ Firebase error details:');
+    console.error('❌ Error message:', error.message);
+    console.error('❌ Error code:', error.code);
+    console.error('❌ Error stack:', error.stack);
+    console.error('❌ Full error object:', error);
     throw error;
   }
 };
 
 export const fetchApprovedReviews = async (limit = 10) => {
+  console.log('📥 Fetching approved reviews from Firebase...');
   try {
     const reviewsQuery = query(
       reviewsRef,
@@ -44,20 +65,31 @@ export const fetchApprovedReviews = async (limit = 10) => {
       limitToLast(limit)
     );
     
+    console.log('📥 Query created');
     const snapshot = await get(reviewsQuery);
+    console.log('📥 Snapshot exists:', snapshot.exists());
+    console.log('📥 Snapshot size:', snapshot.size);
+    
     const reviews = [];
     
     snapshot.forEach((childSnapshot) => {
+      console.log('📥 Found review:', childSnapshot.key, childSnapshot.val());
       reviews.push({
         id: childSnapshot.key,
         ...childSnapshot.val()
       });
     });
     
+    console.log('📥 Total reviews found:', reviews.length);
     // ترتيب من الأحدث إلى الأقدم
-    return reviews.reverse();
+    const reversed = reviews.reverse();
+    console.log('📥 Returning reviews:', reversed);
+    return reversed;
+    
   } catch (error) {
-    console.error('Error fetching reviews from Firebase:', error);
+    console.error('❌ Error fetching reviews from Firebase:', error);
+    console.error('❌ Error message:', error.message);
+    console.error('❌ Error code:', error.code);
     return [];
   }
 };
