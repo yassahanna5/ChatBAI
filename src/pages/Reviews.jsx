@@ -36,28 +36,48 @@ export default function Reviews() {
 
     setLoading(true);
     try {
+      // ✅ التحقق من البريد الإلكتروني بشكل آمن
       let userEmail = 'anonymous@example.com';
       try {
         const user = await base44.auth.me();
-        userEmail = user.email;
+        console.log('👤 User from base44:', user);
+        
+        // ✅ التأكد من وجود email وبأنه ليس undefined
+        if (user && user.email && user.email !== 'undefined') {
+          userEmail = user.email;
+        } else {
+          console.warn('⚠️ User email is missing or undefined, using anonymous');
+        }
       } catch (error) {
-        console.log('User not logged in, using anonymous email');
+        console.warn('⚠️ User not logged in, using anonymous email');
       }
       
-      // حفظ التقييم في Firebase
-      await saveReview({
-        user_name: formData.user_name,
-        job_title: formData.job_title,
-        rating,
-        review_text: formData.review_text,
+      // ✅ التأكد من أن userEmail ليس undefined
+      if (userEmail === undefined || userEmail === 'undefined') {
+        userEmail = 'anonymous@example.com';
+      }
+      
+      console.log('📧 Final email being sent:', userEmail);
+      
+      // تجهيز بيانات التقييم
+      const reviewData = {
+        user_name: formData.user_name || 'Anonymous',
+        job_title: formData.job_title || 'User',
+        rating: rating || 5,
+        review_text: formData.review_text || '',
         user_email: userEmail,
         is_approved: true
-      });
+      };
+      
+      console.log('📤 Sending to Firebase:', reviewData);
+      
+      // حفظ التقييم في Firebase
+      await saveReview(reviewData);
 
       alert(t('reviewSubmitted'));
       navigate(createPageUrl('Home'));
     } catch (error) {
-      console.error('Error submitting review:', error);
+      console.error('❌ Error submitting review:', error);
       alert(language === 'ar' ? 'حدث خطأ في إرسال التقييم' : 'An error occurred while submitting review');
     } finally {
       setLoading(false);
