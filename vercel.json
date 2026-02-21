@@ -6,7 +6,7 @@
     },
     {
       "source": "/api/:path*",
-      "destination": "https://chatbai.base44.app/api/:path*"
+      "destination": "chatbai.base44.app/api/:path*"
     }
   ],
   "env": {
