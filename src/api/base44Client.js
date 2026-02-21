@@ -9,6 +9,9 @@ const BASE_URL = import.meta.env.VITE_BASE44_APP_BASE_URL || appBaseUrl || 'http
 const APP_ID = import.meta.env.VITE_BASE44_APP_ID || appId || '698092d9355e78e06e2f8424';
 const API_KEY = '46d61c5092864feab81ac3a4d2fe3261';
 
+console.log('🔧 BASE_URL:', BASE_URL);
+console.log('🔧 APP_ID:', APP_ID);
+
 // تحديد الـ redirect URL المناسب حسب البيئة
 const getRedirectUrl = () => {
   if (window.location.hostname.includes('vercel.app')) {
@@ -100,6 +103,8 @@ export const checkAuth = async (forceRefresh = false) => {
 export const fetchPlans = async (filters = {}) => {
   try {
     const url = `${BASE_URL}/api/apps/${APP_ID}/entities/Plan`;
+    console.log('📍 Fetching plans from:', url);
+    
     const response = await fetch(url, {
       method: 'GET',
       headers: {
@@ -108,9 +113,13 @@ export const fetchPlans = async (filters = {}) => {
       }
     });
     
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    if (!response.ok) {
+      console.error(`❌ Plans API Error: status ${response.status}`);
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
     
     const data = await response.json();
+    console.log('✅ Plans fetched:', data);
     let plansArray = Array.isArray(data) ? data : [];
     
     if (filters.is_active !== undefined) {
@@ -306,11 +315,13 @@ if (!base44.entities.Review) {
   base44.entities.Review = {};
 }
 
-base44.entities.Review.filter = async (query, sort = '-created_date', limit = 10) => {
+base44.entities.Review.filter = async (query = {}, sort = '-created_date', limit = 10) => {
   try {
     const queryString = encodeURIComponent(JSON.stringify(query));
     const url = `${BASE_URL}/api/apps/${APP_ID}/entities/Review?q=${queryString}&sort=${sort}&limit=${limit}`;
-    console.log('🔍 Fetching reviews from:', url);
+    
+    console.log('🔍 [Review.filter] URL:', url);
+    console.log('🔍 [Review.filter] Query:', query);
     
     const response = await fetch(url, {
       method: 'GET',
@@ -320,16 +331,19 @@ base44.entities.Review.filter = async (query, sort = '-created_date', limit = 10
       }
     });
     
+    console.log('🔍 [Review.filter] Response Status:', response.status);
+    
     if (!response.ok) {
-      console.error(`❌ Review API Error: status ${response.status}`);
+      const errorText = await response.text();
+      console.error(`❌ Review API Error: status ${response.status}`, errorText);
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     
     const data = await response.json();
-    console.log('✅ Reviews fetched successfully:', data);
+    console.log('✅ [Review.filter] Data received:', data);
     return Array.isArray(data) ? data : [];
   } catch (error) {
-    console.error('❌ Error fetching reviews:', error);
+    console.error('❌ [Review.filter] Error:', error);
     return [];
   }
 };
@@ -337,6 +351,9 @@ base44.entities.Review.filter = async (query, sort = '-created_date', limit = 10
 base44.entities.Review.create = async (reviewData) => {
   try {
     const url = `${BASE_URL}/api/apps/${APP_ID}/entities/Review`;
+    console.log('📝 [Review.create] URL:', url);
+    console.log('📝 [Review.create] Data:', reviewData);
+    
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -345,10 +362,20 @@ base44.entities.Review.create = async (reviewData) => {
       },
       body: JSON.stringify(reviewData)
     });
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-    return await response.json();
+    
+    console.log('📝 [Review.create] Response Status:', response.status);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`❌ Create Review Error: status ${response.status}`, errorText);
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    console.log('✅ [Review.create] Success:', data);
+    return data;
   } catch (error) {
-    console.error('Error creating review:', error);
+    console.error('❌ [Review.create] Error:', error);
     throw error;
   }
 };
@@ -359,10 +386,12 @@ if (!base44.entities.Notification) {
   base44.entities.Notification = {};
 }
 
-base44.entities.Notification.filter = async (query) => {
+base44.entities.Notification.filter = async (query = {}) => {
   try {
     const queryString = encodeURIComponent(JSON.stringify(query));
     const url = `${BASE_URL}/api/apps/${APP_ID}/entities/Notification?q=${queryString}`;
+    
+    console.log('🔔 [Notification.filter] URL:', url);
     
     const response = await fetch(url, {
       method: 'GET',
@@ -372,11 +401,16 @@ base44.entities.Notification.filter = async (query) => {
       }
     });
     
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    if (!response.ok) {
+      console.error(`❌ Notification API Error: status ${response.status}`);
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
     const data = await response.json();
+    console.log('✅ [Notification.filter] Data:', data);
     return Array.isArray(data) ? data : [];
   } catch (error) {
-    console.error('Error fetching notifications:', error);
+    console.error('❌ [Notification.filter] Error:', error);
     return [];
   }
 };
