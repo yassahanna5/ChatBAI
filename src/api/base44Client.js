@@ -286,14 +286,21 @@ export const createActivityLog = async (logData) => {
   }
 };
 
-// ==================== دوال User Entity (المضافة حديثاً) ====================
+// ==================== تهيئة كائن entities ====================
 
-// إضافة دوال User إلى كائن base44
-base44.entities = base44.entities || {};
+// التأكد من وجود كائن entities
+if (!base44.entities) {
+  base44.entities = {};
+}
+
+// ==================== دوال User Entity ====================
+
 base44.entities.User = {
   me: async () => {
     try {
       const url = `${BASE_URL}/api/apps/${APP_ID}/entities/User/me`;
+      console.log('📡 Fetching current user from:', url);
+      
       const response = await fetch(url, {
         method: 'GET',
         headers: {
@@ -302,11 +309,17 @@ base44.entities.User = {
         }
       });
       
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      return await response.json();
+      if (!response.ok) {
+        console.error('❌ User API response not OK:', response.status, response.statusText);
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('✅ User fetched:', data);
+      return data;
       
     } catch (error) {
-      console.error('Error fetching current user:', error);
+      console.error('❌ Error fetching current user:', error);
       throw error;
     }
   },
@@ -315,6 +328,7 @@ base44.entities.User = {
     try {
       const queryString = encodeURIComponent(JSON.stringify(query));
       const url = `${BASE_URL}/api/apps/${APP_ID}/entities/User?q=${queryString}`;
+      console.log('📡 Fetching users from:', url);
       
       const response = await fetch(url, {
         method: 'GET',
@@ -324,12 +338,17 @@ base44.entities.User = {
         }
       });
       
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      if (!response.ok) {
+        console.error('❌ Users filter API response not OK:', response.status, response.statusText);
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const data = await response.json();
+      console.log('✅ Users fetched:', data);
       return Array.isArray(data) ? data : [];
       
     } catch (error) {
-      console.error('Error fetching users:', error);
+      console.error('❌ Error fetching users:', error);
       return [];
     }
   }
@@ -353,9 +372,13 @@ base44.entities.Review = {
         }
       });
       
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      if (!response.ok) {
+        console.error('❌ Reviews API response not OK:', response.status, response.statusText);
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       
       const data = await response.json();
+      console.log('✅ Reviews fetched:', data);
       return Array.isArray(data) ? data : [];
       
     } catch (error) {
@@ -367,6 +390,8 @@ base44.entities.Review = {
   create: async (reviewData) => {
     try {
       const url = `${BASE_URL}/api/apps/${APP_ID}/entities/Review`;
+      console.log('📡 Creating review at:', url);
+      console.log('📡 Review data:', reviewData);
       
       const response = await fetch(url, {
         method: 'POST',
@@ -377,12 +402,104 @@ base44.entities.Review = {
         body: JSON.stringify(reviewData)
       });
       
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      return await response.json();
+      if (!response.ok) {
+        console.error('❌ Create review API response not OK:', response.status, response.statusText);
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('✅ Review created:', data);
+      return data;
       
     } catch (error) {
-      console.error('Error creating review:', error);
+      console.error('❌ Error creating review:', error);
       throw error;
     }
   }
 };
+
+// ==================== دوال Notification Entity (إذا لم تكن موجودة) ====================
+
+if (!base44.entities.Notification) {
+  base44.entities.Notification = {
+    filter: async (query) => {
+      try {
+        const queryString = encodeURIComponent(JSON.stringify(query));
+        const url = `${BASE_URL}/api/apps/${APP_ID}/entities/Notification?q=${queryString}`;
+        console.log('📡 Fetching notifications from:', url);
+        
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'api_key': API_KEY,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (!response.ok) {
+          console.error('❌ Notifications API response not OK:', response.status, response.statusText);
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log('✅ Notifications fetched:', data);
+        return Array.isArray(data) ? data : [];
+        
+      } catch (error) {
+        console.error('❌ Error fetching notifications:', error);
+        return [];
+      }
+    },
+    
+    create: async (notificationData) => {
+      try {
+        const url = `${BASE_URL}/api/apps/${APP_ID}/entities/Notification`;
+        console.log('📡 Creating notification at:', url);
+        
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'api_key': API_KEY,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(notificationData)
+        });
+        
+        if (!response.ok) {
+          console.error('❌ Create notification API response not OK:', response.status, response.statusText);
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log('✅ Notification created:', data);
+        return data;
+        
+      } catch (error) {
+        console.error('❌ Error creating notification:', error);
+        return null;
+      }
+    }
+  };
+}
+
+// ==================== دوال Subscription Entity (للكشف) ====================
+
+if (!base44.entities.Subscription) {
+  base44.entities.Subscription = {
+    filter: fetchSubscriptions,
+    create: createSubscription,
+    update: updateSubscription,
+    delete: deleteSubscription
+  };
+}
+
+// ==================== دوال Plan Entity (للكشف) ====================
+
+if (!base44.entities.Plan) {
+  base44.entities.Plan = {
+    filter: fetchPlans,
+    getById: fetchPlanById
+  };
+}
+
+console.log('✅ base44.entities ready with:', Object.keys(base44.entities));
