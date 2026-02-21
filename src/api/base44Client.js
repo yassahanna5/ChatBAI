@@ -5,25 +5,21 @@ import { appParams } from '@/lib/app-params';
 const { appId, token, functionsVersion, appBaseUrl } = appParams;
 
 // استخدام المتغيرات البيئية مع fallback
-const BASE_URL = import.meta.env.VITE_BASE44_APP_BASE_URL || appBaseUrl || 'https://app.base44.com';
+const BASE_URL = import.meta.env.VITE_BASE44_APP_BASE_URL || appBaseUrl || 'https://chatbai.base44.app';
 const APP_ID = import.meta.env.VITE_BASE44_APP_ID || appId || '698092d9355e78e06e2f8424';
 const API_KEY = '46d61c5092864feab81ac3a4d2fe3261';
 
 // تحديد الـ redirect URL المناسب حسب البيئة
 const getRedirectUrl = () => {
-  // في بيئة Vercel - استخدام URL ثابت للحل المؤقت
   if (window.location.hostname.includes('vercel.app')) {
     return 'https://chat-bai-ka16.vercel.app';
   }
-  // في بيئة Netlify
   if (window.location.hostname.includes('netlify.app')) {
     return window.location.origin;
   }
-  // في بيئة التطوير المحلي
   if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
     return 'http://localhost:5173';
   }
-  // الرجوع إلى المتغير البيئي أو domain افتراضي
   return import.meta.env.VITE_APP_URL || window.location.origin;
 };
 
@@ -47,38 +43,30 @@ export const base44 = createClient({
 
 // ==================== نظام المصادقة ====================
 
-// متغير عام لتخزين المستخدم الحالي
 let currentUserCache = null;
 let authCheckPromise = null;
 
-// التحقق من المستخدم الحالي
 export const checkAuth = async (forceRefresh = false) => {
   if (authCheckPromise && !forceRefresh) {
     return authCheckPromise;
   }
 
   if (currentUserCache && !forceRefresh) {
-    console.log('Returning cached user:', currentUserCache.email);
     return currentUserCache;
   }
 
   authCheckPromise = (async () => {
     try {
-      console.log('Fetching user from base44...');
-      
       const user = await base44.auth.me();
       
       if (user && user.email) {
         currentUserCache = user;
-        
         const userData = {
           email: user.email,
           name: user.name || user.email.split('@')[0],
           role: user.role || 'user'
         };
-        
         sessionStorage.setItem('base44_user', JSON.stringify(userData));
-        console.log('User authenticated and cached:', user.email);
         return user;
       }
       
@@ -87,20 +75,16 @@ export const checkAuth = async (forceRefresh = false) => {
       return null;
       
     } catch (error) {
-      console.log('User not authenticated:', error.message);
-      
       try {
         const cachedUser = sessionStorage.getItem('base44_user');
         if (cachedUser) {
           const userData = JSON.parse(cachedUser);
           currentUserCache = userData;
-          console.log('Restored user from session:', userData.email);
           return userData;
         }
       } catch (e) {
         sessionStorage.removeItem('base44_user');
       }
-      
       currentUserCache = null;
       return null;
     } finally {
@@ -113,14 +97,9 @@ export const checkAuth = async (forceRefresh = false) => {
 
 // ==================== دوال Plan Entity ====================
 
-// جلب جميع الخطط
 export const fetchPlans = async (filters = {}) => {
   try {
-    console.log('Fetching plans with filters:', filters);
-    
     const url = `${BASE_URL}/api/apps/${APP_ID}/entities/Plan`;
-    console.log('Fetching from:', url);
-    
     const response = await fetch(url, {
       method: 'GET',
       headers: {
@@ -129,13 +108,9 @@ export const fetchPlans = async (filters = {}) => {
       }
     });
     
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
     
     const data = await response.json();
-    console.log('Plans fetched successfully:', data);
-    
     let plansArray = Array.isArray(data) ? data : [];
     
     if (filters.is_active !== undefined) {
@@ -150,11 +125,9 @@ export const fetchPlans = async (filters = {}) => {
   }
 };
 
-// جلب خطة محددة بالـ ID
 export const fetchPlanById = async (planId) => {
   try {
     const url = `${BASE_URL}/api/apps/${APP_ID}/entities/Plan/${planId}`;
-    
     const response = await fetch(url, {
       method: 'GET',
       headers: {
@@ -163,10 +136,7 @@ export const fetchPlanById = async (planId) => {
       }
     });
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
     return await response.json();
     
   } catch (error) {
@@ -177,14 +147,9 @@ export const fetchPlanById = async (planId) => {
 
 // ==================== دوال Subscription Entity ====================
 
-// جلب الاشتراكات
 export const fetchSubscriptions = async (filters = {}) => {
   try {
-    console.log('Fetching subscriptions with filters:', filters);
-    
     const url = `${BASE_URL}/api/apps/${APP_ID}/entities/Subscription`;
-    console.log('Fetching from:', url);
-    
     const response = await fetch(url, {
       method: 'GET',
       headers: {
@@ -193,13 +158,9 @@ export const fetchSubscriptions = async (filters = {}) => {
       }
     });
     
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
     
     const data = await response.json();
-    console.log('Subscriptions fetched:', data);
-    
     let subsArray = Array.isArray(data) ? data : [];
     
     if (filters.user_email) {
@@ -217,13 +178,9 @@ export const fetchSubscriptions = async (filters = {}) => {
   }
 };
 
-// إنشاء اشتراك جديد
 export const createSubscription = async (subscriptionData) => {
   try {
-    console.log('Creating subscription:', subscriptionData);
-    
     const url = `${BASE_URL}/api/apps/${APP_ID}/entities/Subscription`;
-    
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -233,13 +190,8 @@ export const createSubscription = async (subscriptionData) => {
       body: JSON.stringify(subscriptionData)
     });
     
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    
-    const data = await response.json();
-    console.log('Subscription created successfully:', data);
-    return data;
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    return await response.json();
     
   } catch (error) {
     console.error('Error creating subscription:', error);
@@ -247,13 +199,9 @@ export const createSubscription = async (subscriptionData) => {
   }
 };
 
-// تحديث اشتراك
 export const updateSubscription = async (subscriptionId, updateData) => {
   try {
-    console.log('Updating subscription:', subscriptionId, updateData);
-    
     const url = `${BASE_URL}/api/apps/${APP_ID}/entities/Subscription/${subscriptionId}`;
-    
     const response = await fetch(url, {
       method: 'PUT',
       headers: {
@@ -263,13 +211,8 @@ export const updateSubscription = async (subscriptionId, updateData) => {
       body: JSON.stringify(updateData)
     });
     
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    
-    const data = await response.json();
-    console.log('Subscription updated successfully:', data);
-    return data;
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    return await response.json();
     
   } catch (error) {
     console.error('Error updating subscription:', error);
@@ -277,11 +220,9 @@ export const updateSubscription = async (subscriptionId, updateData) => {
   }
 };
 
-// حذف اشتراك
 export const deleteSubscription = async (subscriptionId) => {
   try {
     const url = `${BASE_URL}/api/apps/${APP_ID}/entities/Subscription/${subscriptionId}`;
-    
     const response = await fetch(url, {
       method: 'DELETE',
       headers: {
@@ -290,11 +231,7 @@ export const deleteSubscription = async (subscriptionId) => {
       }
     });
     
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    
-    console.log('Subscription deleted successfully');
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
     return true;
     
   } catch (error) {
@@ -305,11 +242,9 @@ export const deleteSubscription = async (subscriptionId) => {
 
 // ==================== دوال Notification Entity ====================
 
-// إنشاء إشعار
 export const createNotification = async (notificationData) => {
   try {
     const url = `${BASE_URL}/api/apps/${APP_ID}/entities/Notification`;
-    
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -319,10 +254,7 @@ export const createNotification = async (notificationData) => {
       body: JSON.stringify(notificationData)
     });
     
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
     return await response.json();
     
   } catch (error) {
@@ -333,11 +265,9 @@ export const createNotification = async (notificationData) => {
 
 // ==================== دوال ActivityLog Entity ====================
 
-// تسجيل نشاط
 export const createActivityLog = async (logData) => {
   try {
     const url = `${BASE_URL}/api/apps/${APP_ID}/entities/ActivityLog`;
-    
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -347,10 +277,7 @@ export const createActivityLog = async (logData) => {
       body: JSON.stringify(logData)
     });
     
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
     return await response.json();
     
   } catch (error) {
@@ -359,10 +286,57 @@ export const createActivityLog = async (logData) => {
   }
 };
 
-// ==================== دوال Review Entity (المضافة حديثاً) ====================
+// ==================== دوال User Entity (المضافة حديثاً) ====================
 
-// إضافة دوال Review إلى كائن base44
+// إضافة دوال User إلى كائن base44
 base44.entities = base44.entities || {};
+base44.entities.User = {
+  me: async () => {
+    try {
+      const url = `${BASE_URL}/api/apps/${APP_ID}/entities/User/me`;
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'api_key': API_KEY,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      return await response.json();
+      
+    } catch (error) {
+      console.error('Error fetching current user:', error);
+      throw error;
+    }
+  },
+  
+  filter: async (query) => {
+    try {
+      const queryString = encodeURIComponent(JSON.stringify(query));
+      const url = `${BASE_URL}/api/apps/${APP_ID}/entities/User?q=${queryString}`;
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'api_key': API_KEY,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+      return Array.isArray(data) ? data : [];
+      
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      return [];
+    }
+  }
+};
+
+// ==================== دوال Review Entity ====================
+
 base44.entities.Review = {
   filter: async (query, sort = '-created_date', limit = 10) => {
     try {
@@ -379,13 +353,9 @@ base44.entities.Review = {
         }
       });
       
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       
       const data = await response.json();
-      console.log('✅ Reviews fetched:', data);
-      
       return Array.isArray(data) ? data : [];
       
     } catch (error) {
@@ -407,10 +377,7 @@ base44.entities.Review = {
         body: JSON.stringify(reviewData)
       });
       
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       return await response.json();
       
     } catch (error) {
