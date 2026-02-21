@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { base44 } from '@/api/base44Client';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
@@ -7,6 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { ArrowLeft, Star, Loader2 } from 'lucide-react';
 import { useLanguage } from '@/components/LanguageContext';
+import { base44 } from '@/api/base44Client';
+import { saveReview } from '@/lib/firebase';
 
 export default function Reviews() {
   const navigate = useNavigate();
@@ -35,20 +36,29 @@ export default function Reviews() {
 
     setLoading(true);
     try {
-      const user = await base44.auth.me();
+      let userEmail = 'anonymous@example.com';
+      try {
+        const user = await base44.auth.me();
+        userEmail = user.email;
+      } catch (error) {
+        console.log('User not logged in, using anonymous email');
+      }
       
-      await base44.entities.Review.create({
-        ...formData,
+      // حفظ التقييم في Firebase
+      await saveReview({
+        user_name: formData.user_name,
+        job_title: formData.job_title,
         rating,
-        user_email: user.email,
+        review_text: formData.review_text,
+        user_email: userEmail,
         is_approved: true
       });
 
       alert(t('reviewSubmitted'));
-      navigate(createPageUrl('Chat'));
+      navigate(createPageUrl('Home'));
     } catch (error) {
       console.error('Error submitting review:', error);
-      alert(language === 'ar' ? 'حدث خطأ' : 'An error occurred');
+      alert(language === 'ar' ? 'حدث خطأ في إرسال التقييم' : 'An error occurred while submitting review');
     } finally {
       setLoading(false);
     }
@@ -59,7 +69,7 @@ export default function Reviews() {
       <div className="max-w-2xl mx-auto">
         <Button
           variant="ghost"
-          onClick={() => navigate(createPageUrl('Chat'))}
+          onClick={() => navigate(createPageUrl('Home'))}
           className="mb-6"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
