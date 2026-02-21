@@ -21,24 +21,35 @@ export default function Notifications() {
     try {
       const user = await base44.auth.me();
       const notifs = await base44.entities.Notification.filter({ user_email: user.email }, '-created_date');
-      setNotifications(notifs);
+      // ✅ تأكد أن البيانات مصفوفة
+      setNotifications(Array.isArray(notifs) ? notifs : []);
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error loading notifications:', error);
+      setNotifications([]); // ✅ مصفوفة فارغة في حالة الخطأ
     } finally {
       setLoading(false);
     }
   };
 
   const markAsRead = async (notif) => {
-    await base44.entities.Notification.update(notif.id, { is_read: true });
-    setNotifications(notifications.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
+    try {
+      await base44.entities.Notification.update(notif.id, { is_read: true });
+      setNotifications(notifications.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
+    } catch (error) {
+      console.error('Error marking as read:', error);
+    }
   };
 
   const markAllAsRead = async () => {
-    for (const notif of notifications.filter(n => !n.is_read)) {
-      await base44.entities.Notification.update(notif.id, { is_read: true });
+    try {
+      const unreadNotifs = notifications.filter(n => !n.is_read);
+      for (const notif of unreadNotifs) {
+        await base44.entities.Notification.update(notif.id, { is_read: true });
+      }
+      setNotifications(notifications.map(n => ({ ...n, is_read: true })));
+    } catch (error) {
+      console.error('Error marking all as read:', error);
     }
-    setNotifications(notifications.map(n => ({ ...n, is_read: true })));
   };
 
   const getTypeIcon = (type) => {
@@ -70,7 +81,7 @@ export default function Notifications() {
             {language === 'ar' ? 'العودة' : 'Back'}
           </button>
           
-          {notifications.some(n => !n.is_read) && (
+          {Array.isArray(notifications) && notifications.some(n => !n.is_read) && (
             <Button variant="outline" size="sm" onClick={markAllAsRead}>
               <Check className="w-4 h-4 mr-2" />
               {language === 'ar' ? 'تحديد الكل كمقروء' : 'Mark all as read'}
@@ -84,7 +95,7 @@ export default function Notifications() {
         </h1>
 
         <div className="space-y-4">
-          {notifications.length === 0 ? (
+          {!Array.isArray(notifications) || notifications.length === 0 ? (
             <Card className="p-8 text-center">
               <Bell className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-4" />
               <p className="text-slate-500 dark:text-slate-400">
