@@ -263,6 +263,8 @@ export const createNotification = async (notificationData) => {
   }
 };
 
+// ==================== تهيئة base44.entities ====================
+
 if (!base44.entities) {
   base44.entities = {};
 }
@@ -300,10 +302,16 @@ base44.entities.User = {
 
 // ==================== Review Entity ====================
 
-base44.entities.Review = {
-  filter: async (query, sort = '-created_date', limit = 10) => {
+if (!base44.entities.Review) {
+  base44.entities.Review = {};
+}
+
+base44.entities.Review.filter = async (query, sort = '-created_date', limit = 10) => {
+  try {
     const queryString = encodeURIComponent(JSON.stringify(query));
     const url = `${BASE_URL}/api/apps/${APP_ID}/entities/Review?q=${queryString}&sort=${sort}&limit=${limit}`;
+    console.log('🔍 Fetching reviews from:', url);
+    
     const response = await fetch(url, {
       method: 'GET',
       headers: {
@@ -311,11 +319,23 @@ base44.entities.Review = {
         'Content-Type': 'application/json'
       }
     });
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    
+    if (!response.ok) {
+      console.error(`❌ Review API Error: status ${response.status}`);
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
     const data = await response.json();
+    console.log('✅ Reviews fetched successfully:', data);
     return Array.isArray(data) ? data : [];
-  },
-  create: async (reviewData) => {
+  } catch (error) {
+    console.error('❌ Error fetching reviews:', error);
+    return [];
+  }
+};
+
+base44.entities.Review.create = async (reviewData) => {
+  try {
     const url = `${BASE_URL}/api/apps/${APP_ID}/entities/Review`;
     const response = await fetch(url, {
       method: 'POST',
@@ -327,7 +347,38 @@ base44.entities.Review = {
     });
     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
     return await response.json();
+  } catch (error) {
+    console.error('Error creating review:', error);
+    throw error;
   }
 };
 
-console.log('✅ base44 fully initialized');
+// ==================== Notification Entity ====================
+
+if (!base44.entities.Notification) {
+  base44.entities.Notification = {};
+}
+
+base44.entities.Notification.filter = async (query) => {
+  try {
+    const queryString = encodeURIComponent(JSON.stringify(query));
+    const url = `${BASE_URL}/api/apps/${APP_ID}/entities/Notification?q=${queryString}`;
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'api_key': API_KEY,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    const data = await response.json();
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    console.error('Error fetching notifications:', error);
+    return [];
+  }
+};
+
+console.log('✅ base44 fully initialized with all entities');
