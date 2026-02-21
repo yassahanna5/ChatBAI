@@ -359,5 +359,63 @@ export const createActivityLog = async (logData) => {
   }
 };
 
+// ==================== دوال Review Entity (المضافة حديثاً) ====================
 
-
+// إضافة دوال Review إلى كائن base44
+base44.entities = base44.entities || {};
+base44.entities.Review = {
+  filter: async (query, sort = '-created_date', limit = 10) => {
+    try {
+      const queryString = encodeURIComponent(JSON.stringify(query));
+      const url = `${BASE_URL}/api/apps/${APP_ID}/entities/Review?q=${queryString}&sort=${sort}&limit=${limit}`;
+      
+      console.log('📡 Fetching reviews from:', url);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'api_key': API_KEY,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('✅ Reviews fetched:', data);
+      
+      return Array.isArray(data) ? data : [];
+      
+    } catch (error) {
+      console.error('❌ Error fetching reviews:', error);
+      return [];
+    }
+  },
+  
+  create: async (reviewData) => {
+    try {
+      const url = `${BASE_URL}/api/apps/${APP_ID}/entities/Review`;
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'api_key': API_KEY,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(reviewData)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      return await response.json();
+      
+    } catch (error) {
+      console.error('Error creating review:', error);
+      throw error;
+    }
+  }
+};
