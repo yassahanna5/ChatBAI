@@ -13,7 +13,7 @@ const API_KEY = '46d61c5092864feab81ac3a4d2fe3261';
 const getRedirectUrl = () => {
   // في بيئة Vercel - استخدام URL ثابت للحل المؤقت
   if (window.location.hostname.includes('vercel.app')) {
-    return 'https://chat-bai-ka16.vercel.app';
+    return 'chat-bai-ka16.vercel.app';
   }
   // في بيئة Netlify
   if (window.location.hostname.includes('netlify.app')) {
@@ -358,4 +358,5 @@ export const createActivityLog = async (logData) => {
     return null;
   }
 };
+
 
