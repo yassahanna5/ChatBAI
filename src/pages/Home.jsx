@@ -85,18 +85,24 @@ export default function Home() {
   const loadReviews = async () => {
     try {
       const approvedReviews = await base44.entities.Review.filter({ is_approved: true }, '-created_date', 10);
-      setReviews(approvedReviews);
+      // ✅ تأكد أن البيانات مصفوفة
+      setReviews(Array.isArray(approvedReviews) ? approvedReviews : []);
     } catch (error) {
       console.error('Error loading reviews:', error);
+      setReviews([]); // ✅ مصفوفة فارغة في حالة الخطأ
     }
   };
 
   const nextReview = () => {
-    setCurrentReviewIndex((prev) => (prev + 1) % reviews.length);
+    if (Array.isArray(reviews) && reviews.length > 0) {
+      setCurrentReviewIndex((prev) => (prev + 1) % reviews.length);
+    }
   };
 
   const prevReview = () => {
-    setCurrentReviewIndex((prev) => (prev - 1 + reviews.length) % reviews.length);
+    if (Array.isArray(reviews) && reviews.length > 0) {
+      setCurrentReviewIndex((prev) => (prev - 1 + reviews.length) % reviews.length);
+    }
   };
 
   return (
@@ -308,7 +314,7 @@ export default function Home() {
             </p>
           </div>
           
-          {reviews.length > 0 ? (
+          {Array.isArray(reviews) && reviews.length > 0 ? (
             <div className="relative">
               <AnimatePresence mode="wait">
                 <motion.div
@@ -320,19 +326,21 @@ export default function Home() {
                   className="bg-white dark:bg-slate-800 rounded-2xl p-8 shadow-lg"
                 >
                   <div className="flex gap-1 mb-4 justify-center">
-                    {[...Array(reviews[currentReviewIndex].rating)].map((_, j) => (
-                      <Star key={j} className="w-6 h-6 fill-yellow-400 text-yellow-400" />
-                    ))}
+                    {reviews[currentReviewIndex]?.rating && 
+                      [...Array(reviews[currentReviewIndex].rating)].map((_, j) => (
+                        <Star key={j} className="w-6 h-6 fill-yellow-400 text-yellow-400" />
+                      ))
+                    }
                   </div>
                   <p className="text-slate-700 dark:text-slate-300 mb-6 italic text-center text-lg">
-                    "{reviews[currentReviewIndex].review_text}"
+                    "{reviews[currentReviewIndex]?.review_text || ''}"
                   </p>
                   <div className="text-center">
                     <p className="font-semibold text-slate-900 dark:text-white text-lg">
-                      {reviews[currentReviewIndex].user_name}
+                      {reviews[currentReviewIndex]?.user_name || ''}
                     </p>
                     <p className="text-slate-500 dark:text-slate-400">
-                      {reviews[currentReviewIndex].job_title}
+                      {reviews[currentReviewIndex]?.job_title || ''}
                     </p>
                   </div>
                 </motion.div>
