@@ -7,6 +7,7 @@ import { Bot, BarChart3, Target, Zap, ArrowRight, CheckCircle, TrendingUp, FileT
 import { useLanguage } from '@/components/LanguageContext';
 import { useTheme } from '@/components/ThemeContext';
 import { motion, AnimatePresence } from 'framer-motion';
+import { fetchApprovedReviews } from '@/lib/firebase';
 
 export default function Home() {
   const { t, language, changeLanguage, isRtl } = useLanguage();
@@ -55,24 +56,15 @@ export default function Home() {
   const loadReviews = async () => {
     setLoadingReviews(true);
     try {
-      // ✅ التحقق من وجود الدالة قبل استخدامها
-      if (!base44.entities?.Review?.filter) {
-        console.error('❌ Review.filter is not available');
-        setReviews([]);
-        return;
-      }
-
-      console.log('📍 Starting to fetch reviews...');
-      const approvedReviews = await base44.entities.Review.filter({ is_approved: true }, '-created_date', 10);
+      console.log('📍 Fetching reviews from Firebase...');
+      const reviewsData = await fetchApprovedReviews(10);
       
-      // ✅ تأكد أن البيانات مصفوفة
-      const reviewsData = Array.isArray(approvedReviews) ? approvedReviews : [];
-      console.log('📍 Reviews loaded:', reviewsData);
+      console.log('📍 Reviews loaded from Firebase:', reviewsData);
       setReviews(reviewsData);
       
     } catch (error) {
-      console.error('❌ Error loading reviews:', error);
-      setReviews([]); // ✅ مصفوفة فارغة في حالة الخطأ
+      console.error('❌ Error loading reviews from Firebase:', error);
+      setReviews([]);
     } finally {
       setLoadingReviews(false);
     }
@@ -111,7 +103,7 @@ export default function Home() {
     },
     { 
       icon: Lightbulb, 
-      title: language === 'ar' ? 'التحسين وا��تطوير' : 'Optimization', 
+      title: language === 'ar' ? 'التحسين والتطوير' : 'Optimization', 
       desc: language === 'ar' ? 'توصيات ذكية، أفكار تحسين، خطة الشهر القادم' : 'Smart recommendations, improvement ideas, next month plan' 
     },
   ];
