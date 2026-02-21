@@ -14,9 +14,13 @@ export default function Home() {
   const [user, setUser] = useState(null);
   const [unreadNotifs, setUnreadNotifs] = useState(0);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [reviews, setReviews] = useState([]);
+  const [currentReviewIndex, setCurrentReviewIndex] = useState(0);
+  const [loadingReviews, setLoadingReviews] = useState(true);
 
   useEffect(() => {
     checkAuth();
+    loadReviews();
   }, []);
 
   const checkAuth = async () => {
@@ -32,8 +36,15 @@ export default function Home() {
         }
         
         // ✅ تأكد أن notifs مصفوفة قبل استخدام .length
-        const notifs = await base44.entities.Notification.filter({ user_email: currentUser.email, is_read: false });
-        setUnreadNotifs(Array.isArray(notifs) ? notifs.length : 0);
+        try {
+          if (base44.entities?.Notification?.filter) {
+            const notifs = await base44.entities.Notification.filter({ user_email: currentUser.email, is_read: false });
+            setUnreadNotifs(Array.isArray(notifs) ? notifs.length : 0);
+          }
+        } catch (error) {
+          console.error('Error fetching notifications:', error);
+          setUnreadNotifs(0);
+        }
       }
     } catch (error) {
       console.error('Auth error:', error);
@@ -41,9 +52,37 @@ export default function Home() {
     }
   };
 
+  const loadReviews = async () => {
+    setLoadingReviews(true);
+    try {
+      // ✅ التحقق من وجود الدالة قبل استخدامها
+      if (!base44.entities?.Review?.filter) {
+        console.error('❌ Review.filter is not available');
+        setReviews([]);
+        return;
+      }
+
+      console.log('📍 Starting to fetch reviews...');
+      const approvedReviews = await base44.entities.Review.filter({ is_approved: true }, '-created_date', 10);
+      
+      // ✅ تأكد أن البيانات مصفوفة
+      const reviewsData = Array.isArray(approvedReviews) ? approvedReviews : [];
+      console.log('📍 Reviews loaded:', reviewsData);
+      setReviews(reviewsData);
+      
+    } catch (error) {
+      console.error('❌ Error loading reviews:', error);
+      setReviews([]); // ✅ مصفوفة فارغة في حالة الخطأ
+    } finally {
+      setLoadingReviews(false);
+    }
+  };
+
   const handleLogout = async () => {
     try {
       await base44.auth.logout();
+      setUser(null);
+      setIsAdmin(false);
     } catch (error) {
       console.error('Logout error:', error);
     }
@@ -72,28 +111,10 @@ export default function Home() {
     },
     { 
       icon: Lightbulb, 
-      title: language === 'ar' ? 'التحسين والتطوير' : 'Optimization', 
+      title: language === 'ar' ? 'التحسين وا��تطوير' : 'Optimization', 
       desc: language === 'ar' ? 'توصيات ذكية، أفكار تحسين، خطة الشهر القادم' : 'Smart recommendations, improvement ideas, next month plan' 
     },
   ];
-
-  const [reviews, setReviews] = useState([]);
-  const [currentReviewIndex, setCurrentReviewIndex] = useState(0);
-
-  useEffect(() => {
-    loadReviews();
-  }, []);
-
-  const loadReviews = async () => {
-    try {
-      const approvedReviews = await base44.entities.Review.filter({ is_approved: true }, '-created_date', 10);
-      // ✅ تأكد أن البيانات مصفوفة
-      setReviews(Array.isArray(approvedReviews) ? approvedReviews : []);
-    } catch (error) {
-      console.error('Error loading reviews:', error);
-      setReviews([]); // ✅ مصفوفة فارغة في حالة الخطأ
-    }
-  };
 
   const nextReview = () => {
     if (Array.isArray(reviews) && reviews.length > 0) {
@@ -316,7 +337,16 @@ export default function Home() {
             </p>
           </div>
           
-          {Array.isArray(reviews) && reviews.length > 0 ? (
+          {loadingReviews ? (
+            <div className="text-center py-12">
+              <div className="inline-block">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1995AD]"></div>
+              </div>
+              <p className="text-slate-600 dark:text-slate-400 mt-4">
+                {language === 'ar' ? 'جاري تحميل التقييمات...' : 'Loading reviews...'}
+              </p>
+            </div>
+          ) : Array.isArray(reviews) && reviews.length > 0 ? (
             <div className="relative">
               <AnimatePresence mode="wait">
                 <motion.div
@@ -384,7 +414,7 @@ export default function Home() {
               )}
             </div>
           ) : (
-            <div className="text-center text-slate-500 dark:text-slate-400">
+            <div className="text-center text-slate-500 dark:text-slate-400 py-12">
               {language === 'ar' ? 'لا توجد تقييمات حتى الآن' : 'No reviews yet'}
             </div>
           )}
