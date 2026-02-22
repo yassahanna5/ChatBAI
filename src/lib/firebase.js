@@ -35,12 +35,27 @@ export const saveReview = async (reviewData) => {
     const newReviewRef = push(reviewsRef);
     console.log('📤 New review key generated:', newReviewRef.key);
     
+    // التأكد من أن جميع الحقول المطلوبة موجودة
     const dataToSave = {
-      ...reviewData,
-      createdAt: new Date().toISOString(),
-      is_approved: true
+      user_name: reviewData.user_name || 'Anonymous',
+      job_title: reviewData.job_title || 'User',
+      rating: reviewData.rating || 5,
+      review_text: reviewData.review_text || '',
+      user_email: reviewData.user_email || 'anonymous@example.com',
+      createdAt: new Date().toISOString(),  // هذا هو المطلوب في القواعد
+      is_approved: true  // هذا حقل إضافي
     };
+    
     console.log('📤 Data to save:', dataToSave);
+    console.log('📤 Data keys:', Object.keys(dataToSave));
+    
+    // التحقق من وجود جميع الحقول المطلوبة
+    const requiredFields = ['user_name', 'job_title', 'rating', 'review_text', 'user_email', 'createdAt'];
+    const missingFields = requiredFields.filter(field => !dataToSave.hasOwnProperty(field));
+    
+    if (missingFields.length > 0) {
+      throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
+    }
     
     await set(newReviewRef, dataToSave);
     console.log('✅ Review saved successfully! ID:', newReviewRef.key);
@@ -52,7 +67,15 @@ export const saveReview = async (reviewData) => {
     console.error('❌ Error code:', error.code);
     console.error('❌ Error stack:', error.stack);
     console.error('❌ Full error object:', error);
-    throw error;
+    
+    // رسالة خطأ مخصصة
+    if (error.code === 'PERMISSION_DENIED') {
+      throw new Error('صلاحية الوصول مرفوضة. تأكد من قواعد قاعدة البيانات');
+    } else if (error.code === 'NETWORK_ERROR') {
+      throw new Error('خطأ في الشبكة. تأكد من اتصالك بالإنترنت');
+    } else {
+      throw error;
+    }
   }
 };
 
