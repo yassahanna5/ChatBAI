@@ -20,9 +20,11 @@ export default function Reviews() {
     job_title: '',
     review_text: ''
   });
+  const [errorMessage, setErrorMessage] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setErrorMessage('');
     
     if (rating === 0) {
       alert(language === 'ar' ? 'يرجى اختيار التقييم' : 'Please select a rating');
@@ -42,7 +44,6 @@ export default function Reviews() {
         const user = await base44.auth.me();
         console.log('👤 User from base44:', user);
         
-        // ✅ التأكد من وجود email وبأنه ليس undefined
         if (user && user.email && user.email !== 'undefined') {
           userEmail = user.email;
         } else {
@@ -52,33 +53,37 @@ export default function Reviews() {
         console.warn('⚠️ User not logged in, using anonymous email');
       }
       
-      // ✅ التأكد من أن userEmail ليس undefined
-      if (userEmail === undefined || userEmail === 'undefined') {
-        userEmail = 'anonymous@example.com';
-      }
-      
       console.log('📧 Final email being sent:', userEmail);
       
-      // تجهيز بيانات التقييم
+      // تجهيز بيانات التقييم - تأكد من تطابق أسماء الحقول مع القواعد
       const reviewData = {
-        user_name: formData.user_name || 'Anonymous',
-        job_title: formData.job_title || 'User',
-        rating: rating || 5,
-        review_text: formData.review_text || '',
-        user_email: userEmail,
-        is_approved: true
+        user_name: formData.user_name.trim(),
+        job_title: formData.job_title.trim(),
+        rating: rating,
+        review_text: formData.review_text.trim(),
+        user_email: userEmail
+        // ملاحظة: لا نضيف createdAt هنا لأننا سنضيفه في saveReview
       };
       
       console.log('📤 Sending to Firebase:', reviewData);
+      console.log('📤 Review data keys:', Object.keys(reviewData));
       
       // حفظ التقييم في Firebase
-      await saveReview(reviewData);
+      const result = await saveReview(reviewData);
+      console.log('✅ Save result:', result);
 
       alert(t('reviewSubmitted'));
       navigate(createPageUrl('Home'));
     } catch (error) {
       console.error('❌ Error submitting review:', error);
-      alert(language === 'ar' ? 'حدث خطأ في إرسال التقييم' : 'An error occurred while submitting review');
+      
+      // عرض رسالة خطأ مفصلة
+      const errorMsg = language === 'ar' 
+        ? `حدث خطأ في إرسال التقييم: ${error.message}` 
+        : `An error occurred while submitting review: ${error.message}`;
+      
+      setErrorMessage(errorMsg);
+      alert(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -105,6 +110,12 @@ export default function Reviews() {
               ? 'نحن نقدر رأيك! شاركنا تجربتك مع ChatBAI'
               : 'We value your feedback! Share your experience with ChatBAI'}
           </p>
+
+          {errorMessage && (
+            <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400">
+              {errorMessage}
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Star Rating */}
@@ -144,6 +155,7 @@ export default function Reviews() {
                 value={formData.user_name}
                 onChange={(e) => setFormData({ ...formData, user_name: e.target.value })}
                 placeholder={language === 'ar' ? 'أدخل اسمك' : 'Enter your name'}
+                disabled={loading}
               />
             </div>
 
@@ -157,6 +169,7 @@ export default function Reviews() {
                 value={formData.job_title}
                 onChange={(e) => setFormData({ ...formData, job_title: e.target.value })}
                 placeholder={language === 'ar' ? 'مثال: مدير تسويق' : 'e.g. Marketing Manager'}
+                disabled={loading}
               />
             </div>
 
@@ -173,6 +186,7 @@ export default function Reviews() {
                 placeholder={language === 'ar' 
                   ? 'شاركنا تجربتك مع المنصة...'
                   : 'Share your experience with the platform...'}
+                disabled={loading}
               />
             </div>
 
