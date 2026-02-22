@@ -42,14 +42,20 @@ export default function SignIn() {
         sessionStorage.setItem('currentUser', JSON.stringify({
           email: result.profile.email,
           full_name: result.profile.full_name,
-          id: result.profile.id
+          id: result.profile.id,
+          role: result.profile.role || 'user'
         }));
         
         alert(language === 'ar' 
           ? `مرحباً ${result.profile.full_name}! تم تسجيل الدخول بنجاح.` 
           : `Welcome ${result.profile.full_name}! You have successfully signed in.`);
         
-        navigate(createPageUrl('Chat'));
+        // توجيه الأدمن للوحة التحكم والمستخدم العادي للدردشة
+        if (result.profile.role === 'admin') {
+          navigate(createPageUrl('Admin'));
+        } else {
+          navigate(createPageUrl('Chat'));
+        }
       } else {
         setError(result.error || (language === 'ar' ? 'بريد إلكتروني أو كلمة مرور غير صحيحة' : 'Invalid email or password'));
       }
