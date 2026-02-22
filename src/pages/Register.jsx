@@ -1,26 +1,28 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
-import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Bot, ArrowRight, ArrowLeft, Home } from 'lucide-react';
+import { Loader2, ArrowRight, ArrowLeft } from 'lucide-react';
 import { useLanguage } from '@/components/LanguageContext';
+import { saveProfile, getProfileByEmail } from '@/lib/firebase';
 
 export default function Register() {
   const navigate = useNavigate();
   const { t, language, isRtl } = useLanguage();
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(1);
+  const [error, setError] = useState('');
   
   const [personalData, setPersonalData] = useState({
     full_name: '',
     email: '',
     password: '',
+    confirm_password: '',
     phone: '',
     gender: ''
   });
@@ -41,47 +43,145 @@ export default function Register() {
     competitors: ''
   });
 
-  const handleRegister = async () => {
-    if (!personalData.email || !personalData.password || !personalData.full_name) {
-      alert(language === 'ar' ? 'يرجى إدخال جميع البيانات المطلوبة' : 'Please fill all required fields');
-      return;
+  const validatePersonalData = () => {
+    if (!personalData.full_name.trim()) {
+      setError(language === 'ar' ? 'الاسم الكامل مطلوب' : 'Full name is required');
+      return false;
     }
-
-    // Validate business data
-    if (!businessData.business_name || !businessData.business_type || !businessData.industry || 
-        !businessData.country || !businessData.city || !businessData.company_size || 
-        !businessData.monthly_budget || !businessData.target_audience || 
-        !businessData.current_challenges || !businessData.goals || !businessData.competitors) {
-      alert(language === 'ar' ? 'يرجى إكمال جميع بيانات الشركة المطلوبة' : 'Please complete all required company fields');
-      return;
+    if (!personalData.email.trim()) {
+      setError(language === 'ar' ? 'البريد الإلكتروني مطلوب' : 'Email is required');
+      return false;
     }
+    if (!personalData.password) {
+      setError(language === 'ar' ? 'كلمة المرور مطلوبة' : 'Password is required');
+      return false;
+    }
+    if (personalData.password.length < 6) {
+      setError(language === 'ar' ? 'كلمة المرور يجب أن تكون 6 أحرف على الأقل' : 'Password must be at least 6 characters');
+      return false;
+    }
+    if (personalData.password !== personalData.confirm_password) {
+      setError(language === 'ar' ? 'كلمة المرور غير متطابقة' : 'Passwords do not match');
+      return false;
+    }
+    setError('');
+    return true;
+  };
 
+  const validateBusinessData = () => {
+    if (!businessData.business_name.trim()) {
+      setError(language === 'ar' ? 'اسم الشركة مطلوب' : 'Business name is required');
+      return false;
+    }
+    if (!businessData.business_type.trim()) {
+      setError(language === 'ar' ? 'نوع الشركة مطلوب' : 'Business type is required');
+      return false;
+    }
+    if (!businessData.industry.trim()) {
+      setError(language === 'ar' ? 'المجال مطلوب' : 'Industry is required');
+      return false;
+    }
+    if (!businessData.country.trim()) {
+      setError(language === 'ar' ? 'الدولة مطلوبة' : 'Country is required');
+      return false;
+    }
+    if (!businessData.city.trim()) {
+      setError(language === 'ar' ? 'المدينة مطلوبة' : 'City is required');
+      return false;
+    }
+    if (!businessData.company_size) {
+      setError(language === 'ar' ? 'حجم الشركة مطلوب' : 'Company size is required');
+      return false;
+    }
+    if (!businessData.monthly_budget.trim()) {
+      setError(language === 'ar' ? 'الميزانية الشهرية مطلوبة' : 'Monthly budget is required');
+      return false;
+    }
+    if (!businessData.target_audience.trim()) {
+      setError(language === 'ar' ? 'الجمهور المستهدف مطلوب' : 'Target audience is required');
+      return false;
+    }
+    if (!businessData.current_challenges.trim()) {
+      setError(language === 'ar' ? 'التحديات الحالية مطلوبة' : 'Current challenges are required');
+      return false;
+    }
+    if (!businessData.goals.trim()) {
+      setError(language === 'ar' ? 'الأهداف مطلوبة' : 'Goals are required');
+      return false;
+    }
+    if (!businessData.competitors.trim()) {
+      setError(language === 'ar' ? 'المنافسون مطلوبون' : 'Competitors are required');
+      return false;
+    }
+    setError('');
+    return true;
+  };
+
+  const handleNextStep = async () => {
+    if (!validatePersonalData()) return;
+    
+    // Check if email already exists
     setLoading(true);
     try {
-      // Store only business data and non-sensitive personal info temporarily
-      const registrationData = {
-        personal: {
-          full_name: personalData.full_name,
-          phone: personalData.phone,
-          gender: personalData.gender
-        },
-        business: businessData,
-        timestamp: new Date().toISOString()
+      const existingProfile = await getProfileByEmail(personalData.email);
+      if (existingProfile) {
+        setError(language === 'ar' ? 'البريد الإلكتروني مسجل مسبقاً' : 'Email already registered');
+        setLoading(false);
+        return;
+      }
+      setStep(2);
+    } catch (error) {
+      setError(language === 'ar' ? 'حدث خطأ في التحقق من البريد الإلكتروني' : 'Error checking email');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRegister = async () => {
+    if (!validateBusinessData()) return;
+
+    setLoading(true);
+    setError('');
+    
+    try {
+      // دمج البيانات الشخصية والتجارية
+      const profileData = {
+        ...personalData,
+        ...businessData
       };
       
-      // Store data WITHOUT password for security
-      localStorage.setItem('pendingRegistration', JSON.stringify(registrationData));
+      // حذف confirm_password لأنه مش مطلوب في قاعدة البيانات
+      delete profileData.confirm_password;
+      
+      console.log('📝 Saving profile to Firebase:', profileData);
+      
+      // حفظ الملف الشخصي في Firebase
+      const result = await saveProfile(profileData);
+      
+      console.log('✅ Registration successful:', result);
+      
+      // تخزين بيانات المستخدم في sessionStorage مؤقتاً
+      sessionStorage.setItem('currentUser', JSON.stringify({
+        email: result.email,
+        full_name: result.full_name,
+        id: result.id
+      }));
       
       alert(language === 'ar' 
-        ? 'تم حفظ بياناتك. سيتم توجيهك لإنشاء الحساب.'
-        : 'Your data has been saved. You will be redirected to create account.');
+        ? 'تم إنشاء الحساب بنجاح! سيتم توجيهك إلى لوحة التحكم.'
+        : 'Account created successfully! You will be redirected to dashboard.');
       
-      // Redirect to Base44 auth system
-      base44.auth.redirectToLogin(createPageUrl('Chat'));
+      // التوجيه إلى صفحة الدردشة
+      navigate(createPageUrl('Chat'));
       
     } catch (error) {
-      console.error('Error:', error);
-      alert(language === 'ar' ? 'حدث خطأ' : 'An error occurred');
+      console.error('❌ Registration error:', error);
+      
+      if (error.message === 'Email already exists') {
+        setError(language === 'ar' ? 'البريد الإلكتروني مسجل مسبقاً' : 'Email already registered');
+      } else {
+        setError(language === 'ar' ? 'حدث خطأ في إنشاء الحساب' : 'An error occurred during registration');
+      }
     } finally {
       setLoading(false);
     }
@@ -128,6 +228,14 @@ export default function Register() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
+            
+            {/* عرض رسالة الخطأ إن وجدت */}
+            {error && (
+              <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400">
+                {error}
+              </div>
+            )}
+
             {step === 1 ? (
               <>
                 <div className="space-y-2">
@@ -136,6 +244,7 @@ export default function Register() {
                     value={personalData.full_name}
                     onChange={(e) => setPersonalData({ ...personalData, full_name: e.target.value })}
                     placeholder={language === 'ar' ? 'أدخل الاسم الكامل' : 'Enter full name'}
+                    disabled={loading}
                   />
                 </div>
                 <div className="space-y-2">
@@ -145,6 +254,7 @@ export default function Register() {
                     value={personalData.email}
                     onChange={(e) => setPersonalData({ ...personalData, email: e.target.value })}
                     placeholder={language === 'ar' ? 'أدخل البريد الإلكتروني' : 'Enter email'}
+                    disabled={loading}
                   />
                 </div>
                 <div className="space-y-2">
@@ -154,6 +264,20 @@ export default function Register() {
                     value={personalData.password}
                     onChange={(e) => setPersonalData({ ...personalData, password: e.target.value })}
                     placeholder={language === 'ar' ? 'أدخل كلمة المرور' : 'Enter password'}
+                    disabled={loading}
+                  />
+                  <p className="text-xs text-slate-500">
+                    {language === 'ar' ? 'كلمة المرور يجب أن تكون 6 أحرف على الأقل' : 'Password must be at least 6 characters'}
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label>{language === 'ar' ? 'تأكيد كلمة المرور' : 'Confirm Password'} *</Label>
+                  <Input
+                    type="password"
+                    value={personalData.confirm_password}
+                    onChange={(e) => setPersonalData({ ...personalData, confirm_password: e.target.value })}
+                    placeholder={language === 'ar' ? 'أعد إدخال كلمة المرور' : 'Re-enter password'}
+                    disabled={loading}
                   />
                 </div>
                 <div className="space-y-2">
@@ -162,11 +286,16 @@ export default function Register() {
                     value={personalData.phone}
                     onChange={(e) => setPersonalData({ ...personalData, phone: e.target.value })}
                     placeholder={language === 'ar' ? 'أدخل رقم الهاتف' : 'Enter phone number'}
+                    disabled={loading}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label>{t('gender')}</Label>
-                  <Select value={personalData.gender} onValueChange={(v) => setPersonalData({ ...personalData, gender: v })}>
+                  <Select 
+                    value={personalData.gender} 
+                    onValueChange={(v) => setPersonalData({ ...personalData, gender: v })}
+                    disabled={loading}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder={language === 'ar' ? 'اختر النوع' : 'Select gender'} />
                     </SelectTrigger>
@@ -177,9 +306,22 @@ export default function Register() {
                   </Select>
                 </div>
 
-                <Button onClick={() => setStep(2)} className="w-full bg-[#1995AD] hover:bg-[#1995AD]/90">
-                  {language === 'ar' ? 'التالي' : 'Next'}
-                  <ArrowRight className={`w-4 h-4 ${isRtl ? 'mr-2 rotate-180' : 'ml-2'}`} />
+                <Button 
+                  onClick={handleNextStep} 
+                  disabled={loading}
+                  className="w-full bg-[#1995AD] hover:bg-[#1995AD]/90"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      {language === 'ar' ? 'جاري التحقق...' : 'Checking...'}
+                    </>
+                  ) : (
+                    <>
+                      {language === 'ar' ? 'التالي' : 'Next'}
+                      <ArrowRight className={`w-4 h-4 ${isRtl ? 'mr-2 rotate-180' : 'ml-2'}`} />
+                    </>
+                  )}
                 </Button>
               </>
             ) : (
@@ -191,6 +333,7 @@ export default function Register() {
                       required
                       value={businessData.business_name}
                       onChange={(e) => setBusinessData({ ...businessData, business_name: e.target.value })}
+                      disabled={loading}
                     />
                   </div>
                   <div className="space-y-2">
@@ -199,6 +342,7 @@ export default function Register() {
                       required
                       value={businessData.business_type}
                       onChange={(e) => setBusinessData({ ...businessData, business_type: e.target.value })}
+                      disabled={loading}
                     />
                   </div>
                   <div className="space-y-2">
@@ -207,6 +351,7 @@ export default function Register() {
                       required
                       value={businessData.industry}
                       onChange={(e) => setBusinessData({ ...businessData, industry: e.target.value })}
+                      disabled={loading}
                     />
                   </div>
                   <div className="space-y-2">
@@ -215,6 +360,7 @@ export default function Register() {
                       required
                       value={businessData.country}
                       onChange={(e) => setBusinessData({ ...businessData, country: e.target.value })}
+                      disabled={loading}
                     />
                   </div>
                   <div className="space-y-2">
@@ -223,11 +369,17 @@ export default function Register() {
                       required
                       value={businessData.city}
                       onChange={(e) => setBusinessData({ ...businessData, city: e.target.value })}
+                      disabled={loading}
                     />
                   </div>
                   <div className="space-y-2">
                     <Label>{t('companySize')} *</Label>
-                    <Select required value={businessData.company_size} onValueChange={(v) => setBusinessData({ ...businessData, company_size: v })}>
+                    <Select 
+                      required 
+                      value={businessData.company_size} 
+                      onValueChange={(v) => setBusinessData({ ...businessData, company_size: v })}
+                      disabled={loading}
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder={language === 'ar' ? 'اختر الحجم' : 'Select size'} />
                       </SelectTrigger>
@@ -245,6 +397,7 @@ export default function Register() {
                     <Input
                       value={businessData.website}
                       onChange={(e) => setBusinessData({ ...businessData, website: e.target.value })}
+                      disabled={loading}
                     />
                   </div>
                   <div className="space-y-2">
@@ -253,6 +406,8 @@ export default function Register() {
                       required
                       value={businessData.monthly_budget}
                       onChange={(e) => setBusinessData({ ...businessData, monthly_budget: e.target.value })}
+                      placeholder={language === 'ar' ? 'مثلاً: 5000 دولار' : 'e.g. 5000 USD'}
+                      disabled={loading}
                     />
                   </div>
                 </div>
@@ -264,6 +419,8 @@ export default function Register() {
                     value={businessData.target_audience}
                     onChange={(e) => setBusinessData({ ...businessData, target_audience: e.target.value })}
                     rows={2}
+                    placeholder={language === 'ar' ? 'صف جمهورك المستهدف' : 'Describe your target audience'}
+                    disabled={loading}
                   />
                 </div>
 
@@ -274,6 +431,8 @@ export default function Register() {
                     value={businessData.current_challenges}
                     onChange={(e) => setBusinessData({ ...businessData, current_challenges: e.target.value })}
                     rows={2}
+                    placeholder={language === 'ar' ? 'ما هي التحديات التي تواجهها؟' : 'What challenges are you facing?'}
+                    disabled={loading}
                   />
                 </div>
 
@@ -285,6 +444,7 @@ export default function Register() {
                     onChange={(e) => setBusinessData({ ...businessData, goals: e.target.value })}
                     placeholder={language === 'ar' ? 'مبيعات، براند، عملاء...' : 'Sales, Brand, Customers...'}
                     rows={2}
+                    disabled={loading}
                   />
                 </div>
 
@@ -295,17 +455,34 @@ export default function Register() {
                     value={businessData.competitors}
                     onChange={(e) => setBusinessData({ ...businessData, competitors: e.target.value })}
                     rows={2}
+                    placeholder={language === 'ar' ? 'اذكر أهم منافسيك' : 'List your main competitors'}
+                    disabled={loading}
                   />
                 </div>
 
                 <div className="flex gap-3">
-                  <Button variant="outline" onClick={() => setStep(1)} className="flex-1">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setStep(1)} 
+                    disabled={loading}
+                    className="flex-1"
+                  >
                     <ArrowLeft className={`w-4 h-4 ${isRtl ? 'ml-2 rotate-180' : 'mr-2'}`} />
                     {language === 'ar' ? 'السابق' : 'Back'}
                   </Button>
-                  <Button onClick={handleRegister} disabled={loading} className="flex-1 bg-[#1995AD] hover:bg-[#1995AD]/90">
-                    {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                    {t('createAccount')}
+                  <Button 
+                    onClick={handleRegister} 
+                    disabled={loading} 
+                    className="flex-1 bg-[#1995AD] hover:bg-[#1995AD]/90"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                        {language === 'ar' ? 'جاري إنشاء الحساب...' : 'Creating Account...'}
+                      </>
+                    ) : (
+                      t('createAccount')
+                    )}
                   </Button>
                 </div>
               </>
@@ -315,7 +492,7 @@ export default function Register() {
               <p className="text-sm text-slate-600 dark:text-slate-400">
                 {t('alreadyHaveAccount')}{' '}
                 <button
-                  onClick={() => base44.auth.redirectToLogin(createPageUrl('Chat'))}
+                  onClick={() => navigate(createPageUrl('SignIn'))}
                   className="text-[#1995AD] hover:text-[#1995AD]/80 font-medium"
                 >
                   {t('signIn')}
