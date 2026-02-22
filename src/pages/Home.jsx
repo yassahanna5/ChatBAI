@@ -3,11 +3,11 @@ import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
-import { Bot, BarChart3, Target, Zap, ArrowRight, CheckCircle, TrendingUp, FileText, Lightbulb, Moon, Sun, Bell, Star, MessageCircle, Facebook, Youtube, Send, MessageSquare, ArrowLeft, LogOut, Shield } from 'lucide-react';
+import { Bot, BarChart3, Target, Zap, ArrowRight, CheckCircle, TrendingUp, FileText, Lightbulb, Moon, Sun, Bell, Star, MessageCircle, Facebook, Youtube, Send, MessageSquare, ArrowLeft, LogOut, Shield, LayoutDashboard } from 'lucide-react';
 import { useLanguage } from '@/components/LanguageContext';
 import { useTheme } from '@/components/ThemeContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { fetchApprovedReviews } from '@/lib/firebase';
+import { fetchApprovedReviews, getProfileByEmail } from '@/lib/firebase';
 
 export default function Home() {
   const { t, language, changeLanguage, isRtl } = useLanguage();
@@ -27,25 +27,64 @@ export default function Home() {
 
   const checkAuth = async () => {
     try {
-      const isAuth = await base44.auth.isAuthenticated();
-      if (isAuth) {
-        const currentUser = await base44.auth.me();
-        setUser(currentUser);
+      // 1. التحقق من sessionStorage أولاً
+      const sessionUser = sessionStorage.getItem('currentUser');
+      if (sessionUser) {
+        const parsedUser = JSON.parse(sessionUser);
+        setUser(parsedUser);
+        setIsAdmin(parsedUser.role === 'admin');
         
-        // Check if user is admin from role in database
-        if (currentUser.role === 'admin') {
-          setIsAdmin(true);
-        }
-        
-        // ✅ تأكد أن notifs مصفوفة قبل استخدام .length
+        // جلب الإشعارات إذا كان مستخدم
         try {
-          if (base44.entities?.Notification?.filter) {
-            const notifs = await base44.entities.Notification.filter({ user_email: currentUser.email, is_read: false });
+          if (parsedUser.email && base44.entities?.Notification?.filter) {
+            const notifs = await base44.entities.Notification.filter({ 
+              user_email: parsedUser.email, 
+              is_read: false 
+            });
             setUnreadNotifs(Array.isArray(notifs) ? notifs.length : 0);
           }
         } catch (error) {
           console.error('Error fetching notifications:', error);
-          setUnreadNotifs(0);
+        }
+        return;
+      }
+
+      // 2. إذا مش موجود في sessionStorage، نتحقق من Base44 auth
+      const isAuth = await base44.auth.isAuthenticated();
+      if (isAuth) {
+        const base44User = await base44.auth.me();
+        
+        // 3. نجيب بيانات المستخدم من Firebase باستخدام الإيميل
+        if (base44User && base44User.email) {
+          const firebaseProfile = await getProfileByEmail(base44User.email);
+          
+          if (firebaseProfile) {
+            const userData = {
+              email: firebaseProfile.email,
+              full_name: firebaseProfile.full_name,
+              id: firebaseProfile.id,
+              role: firebaseProfile.role || 'user'
+            };
+            
+            setUser(userData);
+            setIsAdmin(userData.role === 'admin');
+            
+            // نخزن في sessionStorage للاستخدام المستقبلي
+            sessionStorage.setItem('currentUser', JSON.stringify(userData));
+            
+            // جلب الإشعارات
+            try {
+              if (base44.entities?.Notification?.filter) {
+                const notifs = await base44.entities.Notification.filter({ 
+                  user_email: userData.email, 
+                  is_read: false 
+                });
+                setUnreadNotifs(Array.isArray(notifs) ? notifs.length : 0);
+              }
+            } catch (error) {
+              console.error('Error fetching notifications:', error);
+            }
+          }
         }
       }
     } catch (error) {
@@ -65,9 +104,7 @@ export default function Home() {
       console.log('📍 Reviews loaded from Firebase:', reviewsData);
       console.log('📍 Number of reviews:', reviewsData.length);
       
-      // التحقق من أن البيانات مصفوفة
       if (Array.isArray(reviewsData)) {
-        // فلترة التقييمات التي ليس بها أخطاء
         const validReviews = reviewsData.filter(review => 
           review && 
           review.user_name && 
@@ -78,7 +115,6 @@ export default function Home() {
         console.log('📍 Valid reviews after filtering:', validReviews.length);
         setReviews(validReviews);
         
-        // إذا في تقييمات موجودة، اعرض أول واحد
         if (validReviews.length > 0) {
           setCurrentReviewIndex(0);
         }
@@ -90,8 +126,6 @@ export default function Home() {
       
     } catch (error) {
       console.error('❌ Error loading reviews from Firebase:', error);
-      console.error('❌ Error message:', error.message);
-      console.error('❌ Error code:', error.code);
       setReviews([]);
       setReviewsError(error.message);
     } finally {
@@ -101,9 +135,17 @@ export default function Home() {
 
   const handleLogout = async () => {
     try {
+      // مسح من Base44
       await base44.auth.logout();
+      
+      // مسح من sessionStorage
+      sessionStorage.removeItem('currentUser');
+      
       setUser(null);
       setIsAdmin(false);
+      
+      // توجيه للصفحة الرئيسية
+      window.location.href = '/';
     } catch (error) {
       console.error('Logout error:', error);
     }
@@ -149,7 +191,6 @@ export default function Home() {
     }
   };
 
-  // دالة لعرض التقييم الحالي بشكل آمن
   const getCurrentReview = () => {
     if (Array.isArray(reviews) && reviews.length > 0 && currentReviewIndex < reviews.length) {
       return reviews[currentReviewIndex];
@@ -159,7 +200,6 @@ export default function Home() {
 
   const currentReview = getCurrentReview();
 
-  // دالة لعرض النجوم بشكل آمن
   const renderStars = (rating) => {
     if (!rating) return null;
     const starCount = Math.min(5, parseInt(rating) || 0);
@@ -170,12 +210,12 @@ export default function Home() {
 
   return (
     <div className={`min-h-screen bg-gradient-to-br from-[#F1F1F2] via-white to-[#A1D6E2]/20 dark:from-slate-950 dark:via-slate-900 dark:to-[#1995AD]/20 ${isRtl ? 'rtl' : 'ltr'}`}>
-      {/* Navigation - Responsive Navbar مع الحفاظ على نفس التصميم */}
+      {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-700/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between py-4">
             
-            {/* Logo - نفس التصميم بدون تغيير */}
+            {/* Logo */}
             <div className="flex items-center gap-3 flex-shrink-0">
               <img 
                 src="/assets/images/logo.jpg"
@@ -187,10 +227,10 @@ export default function Home() {
               </span>
             </div>
             
-            {/* Actions - متجاوب مع الحفاظ على نفس الأحجام والألوان */}
+            {/* Actions */}
             <div className="flex items-center gap-3 overflow-x-auto hide-scrollbar">
               
-              {/* Dark Mode Toggle - نفس التصميم */}
+              {/* Dark Mode Toggle */}
               <button
                 onClick={toggleDarkMode}
                 className="p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors flex-shrink-0"
@@ -222,7 +262,7 @@ export default function Home() {
                 </button>
               )}
 
-              {/* Language Toggle - نفس التصميم */}
+              {/* Language Toggle */}
               <button
                 onClick={() => changeLanguage(language === 'en' ? 'ar' : 'en')}
                 className="px-3 py-1.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors flex-shrink-0 whitespace-nowrap"
@@ -230,22 +270,20 @@ export default function Home() {
                 {language === 'en' ? 'عربي' : 'English'}
               </button>
 
-              {/* User Actions - Conditional based on auth status */}
+              {/* User Actions */}
               {user ? (
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  {/* Admin Dashboard Button - نفس التصميم */}
+                  {/* Admin Dashboard Button - يظهر فقط للأدمن */}
                   {isAdmin && (
                     <Link to={createPageUrl('Admin')}>
-                      <Button className="bg-[#1995AD] hover:bg-[#1995AD]/90 text-white shadow-md whitespace-nowrap" asChild>
-                        <div>
-                          <Shield className="w-4 h-4 mr-2" />
-                          {language === 'ar' ? 'لوحة الإدارة' : 'Admin Dashboard'}
-                        </div>
+                      <Button className="bg-[#1995AD] hover:bg-[#1995AD]/90 text-white shadow-md whitespace-nowrap">
+                        <LayoutDashboard className="w-4 h-4 mr-2" />
+                        {language === 'ar' ? 'لوحة الإدارة' : 'Admin Dashboard'}
                       </Button>
                     </Link>
                   )}
                   
-                  {/* Dashboard Button - نفس التصميم */}
+                  {/* Dashboard Button - للمستخدم العادي */}
                   <Link to={createPageUrl('Chat')}>
                     <Button className="bg-[#1995AD] hover:bg-[#1995AD]/90 text-white whitespace-nowrap">
                       {t('dashboard')}
@@ -254,17 +292,15 @@ export default function Home() {
                 </div>
               ) : (
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  {/* Sign Up Button - نفس التصميم */}
                   <Link to={createPageUrl('Register')}>
                     <Button variant="ghost" className="whitespace-nowrap">
                       {t('signUp')}
                     </Button>
                   </Link>
                   
-                  {/* Get Started Button - نفس التصميم */}
-                  <Link to={createPageUrl('Register')}>
+                  <Link to={createPageUrl('SignIn')}>
                     <Button className="bg-[#1995AD] hover:bg-[#1995AD]/90 text-white whitespace-nowrap">
-                      {t('getStarted')}
+                      {t('signIn')}
                     </Button>
                   </Link>
                 </div>
@@ -274,6 +310,9 @@ export default function Home() {
         </div>
       </nav>
 
+      {/* باقي الكود زي ما هو بدون تغيير - Hero Section, Features, Testimonials, Footer */}
+      {/* ... */}
+      
       {/* Add padding top to account for fixed navbar */}
       <div className="pt-20"></div>
 
@@ -590,7 +629,7 @@ export default function Home() {
         </div>
       </footer>
 
-      {/* إضافة CSS لإخفاء شريط التمرير مع الحفاظ على وظيفة التمرير */}
+      {/* CSS لإخفاء شريط التمرير */}
       <style jsx>{`
         .hide-scrollbar {
           -ms-overflow-style: none;
