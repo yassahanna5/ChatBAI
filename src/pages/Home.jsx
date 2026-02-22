@@ -18,6 +18,7 @@ export default function Home() {
   const [reviews, setReviews] = useState([]);
   const [currentReviewIndex, setCurrentReviewIndex] = useState(0);
   const [loadingReviews, setLoadingReviews] = useState(true);
+  const [reviewsError, setReviewsError] = useState(null);
 
   useEffect(() => {
     checkAuth();
@@ -55,16 +56,35 @@ export default function Home() {
 
   const loadReviews = async () => {
     setLoadingReviews(true);
+    setReviewsError(null);
+    
     try {
       console.log('📍 Fetching reviews from Firebase...');
       const reviewsData = await fetchApprovedReviews(10);
       
       console.log('📍 Reviews loaded from Firebase:', reviewsData);
-      setReviews(reviewsData);
+      console.log('📍 Number of reviews:', reviewsData.length);
+      
+      // التحقق من أن البيانات مصفوفة
+      if (Array.isArray(reviewsData)) {
+        setReviews(reviewsData);
+        
+        // إذا في تقييمات موجودة، اعرض أول واحد
+        if (reviewsData.length > 0) {
+          setCurrentReviewIndex(0);
+        }
+      } else {
+        console.error('❌ Reviews data is not an array:', reviewsData);
+        setReviews([]);
+        setReviewsError('Invalid data format');
+      }
       
     } catch (error) {
       console.error('❌ Error loading reviews from Firebase:', error);
+      console.error('❌ Error message:', error.message);
+      console.error('❌ Error code:', error.code);
       setReviews([]);
+      setReviewsError(error.message);
     } finally {
       setLoadingReviews(false);
     }
@@ -119,6 +139,16 @@ export default function Home() {
       setCurrentReviewIndex((prev) => (prev - 1 + reviews.length) % reviews.length);
     }
   };
+
+  // دالة لعرض التقييم الحالي بشكل آمن
+  const getCurrentReview = () => {
+    if (Array.isArray(reviews) && reviews.length > 0 && currentReviewIndex < reviews.length) {
+      return reviews[currentReviewIndex];
+    }
+    return null;
+  };
+
+  const currentReview = getCurrentReview();
 
   return (
     <div className={`min-h-screen bg-gradient-to-br from-[#F1F1F2] via-white to-[#A1D6E2]/20 dark:from-slate-950 dark:via-slate-900 dark:to-[#1995AD]/20 ${isRtl ? 'rtl' : 'ltr'}`}>
@@ -338,7 +368,23 @@ export default function Home() {
                 {language === 'ar' ? 'جاري تحميل التقييمات...' : 'Loading reviews...'}
               </p>
             </div>
-          ) : Array.isArray(reviews) && reviews.length > 0 ? (
+          ) : reviewsError ? (
+            <div className="text-center py-12">
+              <div className="text-red-500 dark:text-red-400 mb-4">
+                {language === 'ar' ? 'حدث خطأ في تحميل التقييمات' : 'Error loading reviews'}
+              </div>
+              <p className="text-slate-500 dark:text-slate-400 text-sm">
+                {reviewsError}
+              </p>
+              <Button 
+                onClick={loadReviews} 
+                variant="outline" 
+                className="mt-4"
+              >
+                {language === 'ar' ? 'إعادة المحاولة' : 'Try Again'}
+              </Button>
+            </div>
+          ) : Array.isArray(reviews) && reviews.length > 0 && currentReview ? (
             <div className="relative">
               <AnimatePresence mode="wait">
                 <motion.div
@@ -350,21 +396,21 @@ export default function Home() {
                   className="bg-white dark:bg-slate-800 rounded-2xl p-8 shadow-lg"
                 >
                   <div className="flex gap-1 mb-4 justify-center">
-                    {reviews[currentReviewIndex]?.rating && 
-                      [...Array(reviews[currentReviewIndex].rating)].map((_, j) => (
+                    {currentReview.rating && 
+                      [...Array(Math.min(5, currentReview.rating))].map((_, j) => (
                         <Star key={j} className="w-6 h-6 fill-yellow-400 text-yellow-400" />
                       ))
                     }
                   </div>
                   <p className="text-slate-700 dark:text-slate-300 mb-6 italic text-center text-lg">
-                    "{reviews[currentReviewIndex]?.review_text || ''}"
+                    "{currentReview.review_text || ''}"
                   </p>
                   <div className="text-center">
                     <p className="font-semibold text-slate-900 dark:text-white text-lg">
-                      {reviews[currentReviewIndex]?.user_name || ''}
+                      {currentReview.user_name || ''}
                     </p>
                     <p className="text-slate-500 dark:text-slate-400">
-                      {reviews[currentReviewIndex]?.job_title || ''}
+                      {currentReview.job_title || ''}
                     </p>
                   </div>
                 </motion.div>
@@ -391,6 +437,7 @@ export default function Home() {
                             ? 'bg-[#1995AD] w-8'
                             : 'bg-slate-300 dark:bg-slate-600'
                         }`}
+                        aria-label={`Go to review ${i + 1}`}
                       />
                     ))}
                   </div>
@@ -408,6 +455,13 @@ export default function Home() {
           ) : (
             <div className="text-center text-slate-500 dark:text-slate-400 py-12">
               {language === 'ar' ? 'لا توجد تقييمات حتى الآن' : 'No reviews yet'}
+              <div className="mt-4">
+                <Link to={createPageUrl('Reviews')}>
+                  <Button variant="outline" className="mt-2">
+                    {language === 'ar' ? 'كن أول من يقيم' : 'Be the first to review'}
+                  </Button>
+                </Link>
+              </div>
             </div>
           )}
         </div>
@@ -465,6 +519,9 @@ export default function Home() {
                 </Link>
                 <Link to={createPageUrl('Support')} className="block text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 text-sm">
                   {language === 'ar' ? 'الدعم' : 'Support'}
+                </Link>
+                <Link to={createPageUrl('Reviews')} className="block text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 text-sm">
+                  {language === 'ar' ? 'التقييمات' : 'Reviews'}
                 </Link>
               </div>
             </div>
