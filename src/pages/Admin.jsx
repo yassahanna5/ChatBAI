@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Loader2, 
   Users, 
@@ -11,11 +10,8 @@ import {
   Activity, 
   Star, 
   LogOut, 
-  Menu,
-  X,
   LayoutDashboard,
   FileText,
-  Settings,
   Bell,
   Home,
   ChevronRight,
@@ -26,15 +22,24 @@ import {
   Save,
   Eye,
   DollarSign,
-  TrendingUp,
+  BarChart3,
+  Sun,
+  Moon,
+  Download,
+  CheckCircle,
+  XCircle,
+  UserCog,
+  Mail,
+  Phone,
+  Calendar,
   Globe,
   Smartphone,
   Monitor,
   Clock,
-  BarChart3,
-  Sun,      // 👈 أضف ده
-  Moon,      // 👈 أضف ده
-  Download
+  TrendingUp,
+  CheckSquare,
+  XSquare,
+  RefreshCw
 } from 'lucide-react';
 import { useLanguage } from '@/components/LanguageContext';
 import { useTheme } from '@/components/ThemeContext';
@@ -45,13 +50,19 @@ import {
   updatePlan, 
   deletePlan,
   getAllSubscriptions,
-  updateSubscription,
-  deleteSubscription,
   getAllPayments,
-  fetchApprovedReviews,
+  getAllReviews,
   getAdminStats,
   logActivity,
-  getActivityLogs
+  getActivityLogs,
+  getNotifications,
+  markNotificationAsRead,
+  deleteNotification,
+  updateUserRole,
+  addUserByAdmin,
+  deleteUser,
+  updateReviewApproval,
+  deleteReview
 } from '@/lib/firebase';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -62,6 +73,10 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Separator } from '@/components/ui/separator';
 
 export default function Admin() {
   const navigate = useNavigate();
@@ -79,9 +94,18 @@ export default function Admin() {
     activePlans: 0,
     activeSubscriptions: 0,
     totalReviews: 0,
-    totalVisits: 135,
+    totalVisits: 0,
     uniqueVisitors: 0,
-    avgVisitDuration: '4m 32s'
+    avgVisitDuration: '0m 0s',
+    conversionRate: 0,
+    visitIncrease: 0,
+    uniqueIncrease: 0,
+    durationIncrease: 0,
+    conversionIncrease: 0,
+    topCountries: [],
+    devices: {},
+    osStats: {},
+    pageViews: []
   });
   
   const [users, setUsers] = useState([]);
@@ -90,26 +114,59 @@ export default function Admin() {
   const [payments, setPayments] = useState([]);
   const [reviews, setReviews] = useState([]);
   const [activityLogs, setActivityLogs] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   
   // Modal states
   const [showPlanModal, setShowPlanModal] = useState(false);
   const [showUserModal, setShowUserModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showNotificationsDialog, setShowNotificationsDialog] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [deleteType, setDeleteType] = useState('');
+  const [editingUser, setEditingUser] = useState(null);
   
   // Form states
   const [planForm, setPlanForm] = useState({
-    name: '',
+    name_en: '',
+    name_ar: '',
     price: '',
-    features: '',
-    is_active: true
+    billing_cycle: 'monthly',
+    credits: '',
+    tokens_per_question: '500',
+    features_en: '',
+    features_ar: '',
+    is_active: true,
+    order: '0'
+  });
+
+  const [userForm, setUserForm] = useState({
+    email: '',
+    password: '',
+    full_name: '',
+    phone: '',
+    gender: '',
+    role: 'user',
+    business_name: '',
+    country: '',
+    city: ''
   });
 
   useEffect(() => {
     checkAuth();
     loadData();
-  }, []);
+    loadNotifications();
+    
+    // تحديث البيانات كل 30 ثانية
+    const interval = setInterval(() => {
+      if (activeTab === 'dashboard') {
+        refreshAnalytics();
+      }
+      loadNotifications();
+    }, 30000);
+    
+    return () => clearInterval(interval);
+  }, [activeTab]);
 
   const checkAuth = () => {
     const userStr = sessionStorage.getItem('currentUser');
@@ -145,7 +202,7 @@ export default function Admin() {
         getAllPlans(),
         getAllSubscriptions(),
         getAllPayments(),
-        fetchApprovedReviews(100),
+        getAllReviews(),
         getActivityLogs(50)
       ]);
       
@@ -171,34 +228,111 @@ export default function Admin() {
     }
   };
 
+  const refreshAnalytics = async () => {
+    try {
+      const statsData = await getAdminStats();
+      setStats(statsData);
+    } catch (error) {
+      console.error('Error refreshing analytics:', error);
+    }
+  };
+
+  const loadNotifications = async () => {
+    try {
+      const notifs = await getNotifications(20);
+      setNotifications(notifs);
+      setUnreadCount(notifs.filter(n => !n.is_read).length);
+    } catch (error) {
+      console.error('Error loading notifications:', error);
+    }
+  };
+
+  const handleMarkAsRead = async (notificationId) => {
+    await markNotificationAsRead(notificationId);
+    loadNotifications();
+  };
+
+  const handleDeleteNotification = async (notificationId) => {
+    await deleteNotification(notificationId);
+    loadNotifications();
+  };
+
   const handleLogout = () => {
     sessionStorage.removeItem('currentUser');
     navigate(createPageUrl('Home'));
   };
 
-  // Plan CRUD handlers
+  // ==================== User Management ====================
+
+  const handleUpdateUserRole = async (userId, newRole) => {
+    const result = await updateUserRole(userId, newRole);
+    if (result.success) {
+      loadData();
+      loadNotifications();
+    }
+  };
+
+  const handleAddUser = async () => {
+    if (!userForm.email || !userForm.password || !userForm.full_name) {
+      alert(language === 'ar' ? 'البريد الإلكتروني وكلمة المرور والاسم مطلوبون' : 'Email, password and name are required');
+      return;
+    }
+
+    const result = await addUserByAdmin(userForm);
+    if (result.success) {
+      setShowUserModal(false);
+      setUserForm({
+        email: '',
+        password: '',
+        full_name: '',
+        phone: '',
+        gender: '',
+        role: 'user',
+        business_name: '',
+        country: '',
+        city: ''
+      });
+      loadData();
+      loadNotifications();
+    } else {
+      alert(result.error || 'Error creating user');
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!selectedItem) return;
+    await deleteUser(selectedItem.id);
+    setShowDeleteDialog(false);
+    setSelectedItem(null);
+    loadData();
+    loadNotifications();
+  };
+
+  // ==================== Plan Management ====================
+
   const handleCreatePlan = async () => {
-    if (!planForm.name || !planForm.price || !planForm.features) {
-      alert(language === 'ar' ? 'جميع الحقول مطلوبة' : 'All fields are required');
+    if (!planForm.name_en || !planForm.price || !planForm.credits) {
+      alert(language === 'ar' ? 'جميع الحقول المطلوبة يجب ملؤها' : 'All required fields must be filled');
       return;
     }
     
     try {
-      await createPlan({
-        ...planForm,
-        price: parseFloat(planForm.price)
-      });
-      
-      await logActivity({
-        action: 'create_plan',
-        user_email: currentUser.email,
-        details: `Created plan: ${planForm.name}`
-      });
-      
+      await createPlan(planForm);
       setShowPlanModal(false);
-      setPlanForm({ name: '', price: '', features: '', is_active: true });
+      setPlanForm({
+        name_en: '',
+        name_ar: '',
+        price: '',
+        billing_cycle: 'monthly',
+        credits: '',
+        tokens_per_question: '500',
+        features_en: '',
+        features_ar: '',
+        is_active: true,
+        order: '0'
+      });
       loadData();
-      
+      loadNotifications();
     } catch (error) {
       console.error('Error creating plan:', error);
     }
@@ -208,22 +342,23 @@ export default function Admin() {
     if (!selectedItem) return;
     
     try {
-      await updatePlan(selectedItem.id, {
-        ...planForm,
-        price: parseFloat(planForm.price)
-      });
-      
-      await logActivity({
-        action: 'update_plan',
-        user_email: currentUser.email,
-        details: `Updated plan: ${planForm.name}`
-      });
-      
+      await updatePlan(selectedItem.id, planForm);
       setShowPlanModal(false);
       setSelectedItem(null);
-      setPlanForm({ name: '', price: '', features: '', is_active: true });
+      setPlanForm({
+        name_en: '',
+        name_ar: '',
+        price: '',
+        billing_cycle: 'monthly',
+        credits: '',
+        tokens_per_question: '500',
+        features_en: '',
+        features_ar: '',
+        is_active: true,
+        order: '0'
+      });
       loadData();
-      
+      loadNotifications();
     } catch (error) {
       console.error('Error updating plan:', error);
     }
@@ -234,17 +369,10 @@ export default function Admin() {
     
     try {
       await deletePlan(selectedItem.id);
-      
-      await logActivity({
-        action: 'delete_plan',
-        user_email: currentUser.email,
-        details: `Deleted plan: ${selectedItem.name}`
-      });
-      
       setShowDeleteDialog(false);
       setSelectedItem(null);
       loadData();
-      
+      loadNotifications();
     } catch (error) {
       console.error('Error deleting plan:', error);
     }
@@ -254,17 +382,59 @@ export default function Admin() {
     if (plan) {
       setSelectedItem(plan);
       setPlanForm({
-        name: plan.name || '',
+        name_en: plan.name_en || '',
+        name_ar: plan.name_ar || '',
         price: plan.price?.toString() || '',
-        features: plan.features || '',
-        is_active: plan.is_active !== false
+        billing_cycle: plan.billing_cycle || 'monthly',
+        credits: plan.credits?.toString() || '',
+        tokens_per_question: plan.tokens_per_question?.toString() || '500',
+        features_en: Array.isArray(plan.features_en) ? plan.features_en.join(', ') : plan.features_en || '',
+        features_ar: Array.isArray(plan.features_ar) ? plan.features_ar.join(', ') : plan.features_ar || '',
+        is_active: plan.is_active !== false,
+        order: plan.order?.toString() || '0'
       });
     } else {
       setSelectedItem(null);
-      setPlanForm({ name: '', price: '', features: '', is_active: true });
+      setPlanForm({
+        name_en: '',
+        name_ar: '',
+        price: '',
+        billing_cycle: 'monthly',
+        credits: '',
+        tokens_per_question: '500',
+        features_en: '',
+        features_ar: '',
+        is_active: true,
+        order: '0'
+      });
     }
     setShowPlanModal(true);
   };
+
+  // ==================== Review Management ====================
+
+  const handleUpdateReviewApproval = async (reviewId, isApproved) => {
+    await updateReviewApproval(reviewId, isApproved);
+    loadData();
+    loadNotifications();
+  };
+
+  const handleDeleteReview = async (reviewId) => {
+    setSelectedItem({ id: reviewId });
+    setDeleteType('review');
+    setShowDeleteDialog(true);
+  };
+
+  const confirmDeleteReview = async () => {
+    if (!selectedItem) return;
+    await deleteReview(selectedItem.id);
+    setShowDeleteDialog(false);
+    setSelectedItem(null);
+    loadData();
+    loadNotifications();
+  };
+
+  // ==================== Utility Functions ====================
 
   const confirmDelete = (item, type) => {
     setSelectedItem(item);
@@ -276,7 +446,7 @@ export default function Admin() {
     if (!dateString) return '-';
     return new Date(dateString).toLocaleDateString(
       language === 'ar' ? 'ar-EG' : 'en-US',
-      { year: 'numeric', month: 'short', day: 'numeric' }
+      { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }
     );
   };
 
@@ -286,6 +456,34 @@ export default function Admin() {
       currency: 'USD',
       minimumFractionDigits: 2
     }).format(amount || 0);
+  };
+
+  const getInitials = (name) => {
+    return name
+      .split(' ')
+      .map(word => word[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  const getDeviceIcon = (device) => {
+    switch(device?.toLowerCase()) {
+      case 'mobile': return <Smartphone className="w-4 h-4" />;
+      case 'tablet': return <Smartphone className="w-4 h-4" />;
+      default: return <Monitor className="w-4 h-4" />;
+    }
+  };
+
+  const getOsIcon = (os) => {
+    switch(os?.toLowerCase()) {
+      case 'android': return '📱';
+      case 'ios': return '🍎';
+      case 'windows': return '💻';
+      case 'macos': return '💻';
+      case 'linux': return '🐧';
+      default: return '💻';
+    }
   };
 
   if (loading) {
@@ -368,7 +566,7 @@ export default function Admin() {
                 : 'hover:bg-slate-100 dark:hover:bg-slate-700'
             }`}
           >
-            <Activity className="w-5 h-5 flex-shrink-0" />
+            <CreditCard className="w-5 h-5 flex-shrink-0" />
             {sidebarOpen && <span>{language === 'ar' ? 'الاشتراكات' : 'Subscriptions'}</span>}
           </button>
           
@@ -380,7 +578,7 @@ export default function Admin() {
                 : 'hover:bg-slate-100 dark:hover:bg-slate-700'
             }`}
           >
-            <CreditCard className="w-5 h-5 flex-shrink-0" />
+            <DollarSign className="w-5 h-5 flex-shrink-0" />
             {sidebarOpen && <span>{language === 'ar' ? 'المدفوعات' : 'Payments'}</span>}
           </button>
           
@@ -451,9 +649,22 @@ export default function Admin() {
                 {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
               </button>
               
-              <button className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors relative">
+              <button
+                onClick={() => setShowNotificationsDialog(true)}
+                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors relative"
+              >
                 <Bell className="w-5 h-5" />
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                {unreadCount > 0 && (
+                  <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                )}
+              </button>
+
+              <button
+                onClick={refreshAnalytics}
+                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                title={language === 'ar' ? 'تحديث' : 'Refresh'}
+              >
+                <RefreshCw className="w-5 h-5" />
               </button>
             </div>
           </div>
@@ -461,6 +672,7 @@ export default function Admin() {
 
         {/* Content */}
         <div className="p-6">
+          {/* Dashboard Tab */}
           {activeTab === 'dashboard' && (
             <div className="space-y-6">
               {/* Stats Cards */}
@@ -532,11 +744,14 @@ export default function Admin() {
 
               {/* Analytics Section */}
               <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle className="flex items-center gap-2">
                     <BarChart3 className="w-5 h-5" />
                     {language === 'ar' ? 'التحليلات' : 'Analytics'}
                   </CardTitle>
+                  <Badge variant="outline" className="text-xs">
+                    {language === 'ar' ? 'آخر تحديث: الآن' : 'Live'}
+                  </Badge>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -545,7 +760,7 @@ export default function Admin() {
                         {language === 'ar' ? 'إجمالي الزيارات' : 'Total Visits'}
                       </p>
                       <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.totalVisits}</p>
-                      <p className="text-sm text-green-600 mt-1">+12% from last month</p>
+                      <p className="text-sm text-green-600 mt-1">+{stats.visitIncrease}% from last month</p>
                     </div>
                     
                     <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-lg">
@@ -553,7 +768,7 @@ export default function Admin() {
                         {language === 'ar' ? 'الزوار الفريدين' : 'Unique Visitors'}
                       </p>
                       <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.uniqueVisitors}</p>
-                      <p className="text-sm text-green-600 mt-1">+8% from last month</p>
+                      <p className="text-sm text-green-600 mt-1">+{stats.uniqueIncrease}% from last month</p>
                     </div>
                     
                     <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-lg">
@@ -561,15 +776,15 @@ export default function Admin() {
                         {language === 'ar' ? 'متوسط مدة الزيارة' : 'Avg Visit Duration'}
                       </p>
                       <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.avgVisitDuration}</p>
-                      <p className="text-sm text-green-600 mt-1">+5% from last month</p>
+                      <p className="text-sm text-green-600 mt-1">+{stats.durationIncrease}% from last month</p>
                     </div>
                     
                     <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-lg">
                       <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">
                         {language === 'ar' ? 'معدل التحويل' : 'Conversion Rate'}
                       </p>
-                      <p className="text-2xl font-bold text-slate-900 dark:text-white">3.2%</p>
-                      <p className="text-sm text-green-600 mt-1">+2% from last month</p>
+                      <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.conversionRate}%</p>
+                      <p className="text-sm text-green-600 mt-1">+{stats.conversionIncrease}% from last month</p>
                     </div>
                   </div>
 
@@ -579,33 +794,22 @@ export default function Admin() {
                       {language === 'ar' ? 'أفضل الدول' : 'Top Countries'}
                     </h3>
                     <div className="space-y-3">
-                      <div className="flex items-center gap-4">
-                        <span className="w-24 text-slate-600 dark:text-slate-400">
-                          {language === 'ar' ? 'مصر' : 'Egypt'}
-                        </span>
-                        <div className="flex-1 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                          <div className="h-full bg-[#1995AD] rounded-full" style={{ width: '100%' }}></div>
+                      {stats.topCountries.map((country) => (
+                        <div key={country.country} className="flex items-center gap-4">
+                          <span className="w-24 text-slate-600 dark:text-slate-400">
+                            {country.country}
+                          </span>
+                          <div className="flex-1 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-[#1995AD] rounded-full" 
+                              style={{ width: `${country.percentage}%` }}
+                            />
+                          </div>
+                          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                            {country.percentage}%
+                          </span>
                         </div>
-                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">100%</span>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <span className="w-24 text-slate-600 dark:text-slate-400">
-                          {language === 'ar' ? 'السعودية' : 'Saudi Arabia'}
-                        </span>
-                        <div className="flex-1 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                          <div className="h-full bg-[#1995AD] rounded-full" style={{ width: '85%' }}></div>
-                        </div>
-                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">85%</span>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <span className="w-24 text-slate-600 dark:text-slate-400">
-                          {language === 'ar' ? 'الإمارات' : 'UAE'}
-                        </span>
-                        <div className="flex-1 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                          <div className="h-full bg-[#1995AD] rounded-full" style={{ width: '70%' }}></div>
-                        </div>
-                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">70%</span>
-                      </div>
+                      ))}
                     </div>
                   </div>
 
@@ -616,20 +820,17 @@ export default function Admin() {
                         {language === 'ar' ? 'الأجهزة' : 'Devices'}
                       </h3>
                       <div className="space-y-3">
-                        <div className="flex items-center gap-4">
-                          <Smartphone className="w-5 h-5 text-slate-500" />
-                          <span className="flex-1 text-slate-600 dark:text-slate-400">
-                            {language === 'ar' ? 'جوال' : 'Mobile'}
-                          </span>
-                          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">65%</span>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <Monitor className="w-5 h-5 text-slate-500" />
-                          <span className="flex-1 text-slate-600 dark:text-slate-400">
-                            {language === 'ar' ? 'كمبيوتر' : 'Desktop'}
-                          </span>
-                          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">35%</span>
-                        </div>
+                        {Object.entries(stats.devices).map(([device, percentage]) => (
+                          <div key={device} className="flex items-center gap-4">
+                            {getDeviceIcon(device)}
+                            <span className="flex-1 text-slate-600 dark:text-slate-400">
+                              {device}
+                            </span>
+                            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                              {percentage}%
+                            </span>
+                          </div>
+                        ))}
                       </div>
                     </div>
                     
@@ -638,21 +839,15 @@ export default function Admin() {
                         {language === 'ar' ? 'نظام التشغيل' : 'OS'}
                       </h3>
                       <div className="space-y-3">
-                        <div className="flex items-center gap-4">
-                          <span className="w-5 h-5">📱</span>
-                          <span className="flex-1 text-slate-600 dark:text-slate-400">Android</span>
-                          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">45%</span>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <span className="w-5 h-5">🍎</span>
-                          <span className="flex-1 text-slate-600 dark:text-slate-400">iOS</span>
-                          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">30%</span>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <span className="w-5 h-5">💻</span>
-                          <span className="flex-1 text-slate-600 dark:text-slate-400">Windows</span>
-                          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">25%</span>
-                        </div>
+                        {Object.entries(stats.osStats).map(([os, percentage]) => (
+                          <div key={os} className="flex items-center gap-4">
+                            <span className="w-5 h-5">{getOsIcon(os)}</span>
+                            <span className="flex-1 text-slate-600 dark:text-slate-400">{os}</span>
+                            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                              {percentage}%
+                            </span>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>
@@ -663,27 +858,20 @@ export default function Admin() {
                       {language === 'ar' ? 'مشاهدات الصفحات' : 'Page Views'}
                     </h3>
                     <div className="space-y-3">
-                      <div className="flex items-center gap-4">
-                        <span className="w-24 text-slate-600 dark:text-slate-400">/chat</span>
-                        <div className="flex-1 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                          <div className="h-full bg-[#1995AD] rounded-full" style={{ width: '100%' }}></div>
+                      {stats.pageViews.map((page) => (
+                        <div key={page.page} className="flex items-center gap-4">
+                          <span className="w-24 text-slate-600 dark:text-slate-400">{page.page}</span>
+                          <div className="flex-1 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-[#1995AD] rounded-full" 
+                              style={{ width: `${page.percentage}%` }}
+                            />
+                          </div>
+                          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                            {page.count}
+                          </span>
                         </div>
-                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">1,250</span>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <span className="w-24 text-slate-600 dark:text-slate-400">/plans</span>
-                        <div className="flex-1 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                          <div className="h-full bg-[#1995AD] rounded-full" style={{ width: '68%' }}></div>
-                        </div>
-                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">850</span>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <span className="w-24 text-slate-600 dark:text-slate-400">/</span>
-                        <div className="flex-1 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                          <div className="h-full bg-[#1995AD] rounded-full" style={{ width: '57.6%' }}></div>
-                        </div>
-                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">720</span>
-                      </div>
+                      ))}
                     </div>
                   </div>
                 </CardContent>
@@ -691,12 +879,30 @@ export default function Admin() {
             </div>
           )}
 
+          {/* Users Tab */}
           {activeTab === 'users' && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   <span>{language === 'ar' ? 'المستخدمين' : 'Users'}</span>
-                  <Button className="bg-[#1995AD] hover:bg-[#1995AD]/90">
+                  <Button 
+                    onClick={() => {
+                      setEditingUser(null);
+                      setUserForm({
+                        email: '',
+                        password: '',
+                        full_name: '',
+                        phone: '',
+                        gender: '',
+                        role: 'user',
+                        business_name: '',
+                        country: '',
+                        city: ''
+                      });
+                      setShowUserModal(true);
+                    }} 
+                    className="bg-[#1995AD] hover:bg-[#1995AD]/90"
+                  >
                     <Plus className="w-4 h-4 mr-2" />
                     {language === 'ar' ? 'إضافة مستخدم' : 'Add User'}
                   </Button>
@@ -706,9 +912,10 @@ export default function Admin() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>{language === 'ar' ? 'الاسم' : 'Name'}</TableHead>
+                      <TableHead>{language === 'ar' ? 'المستخدم' : 'User'}</TableHead>
                       <TableHead>Email</TableHead>
                       <TableHead>{language === 'ar' ? 'الدور' : 'Role'}</TableHead>
+                      <TableHead>{language === 'ar' ? 'الدولة' : 'Country'}</TableHead>
                       <TableHead>{language === 'ar' ? 'تاريخ التسجيل' : 'Joined'}</TableHead>
                       <TableHead>{language === 'ar' ? 'آخر دخول' : 'Last Login'}</TableHead>
                       <TableHead>{language === 'ar' ? 'إجراءات' : 'Actions'}</TableHead>
@@ -717,21 +924,40 @@ export default function Admin() {
                   <TableBody>
                     {users.map((user) => (
                       <TableRow key={user.id}>
-                        <TableCell className="font-medium">{user.full_name}</TableCell>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            <Avatar className="h-8 w-8">
+                              <AvatarFallback>{getInitials(user.full_name)}</AvatarFallback>
+                            </Avatar>
+                            {user.full_name}
+                          </div>
+                        </TableCell>
                         <TableCell>{user.email}</TableCell>
                         <TableCell>
-                          <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
-                            {user.role === 'admin' ? 'Admin' : 'User'}
-                          </Badge>
+                          <Select
+                            value={user.role || 'user'}
+                            onValueChange={(value) => handleUpdateUserRole(user.id, value)}
+                          >
+                            <SelectTrigger className="w-24">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="user">User</SelectItem>
+                              <SelectItem value="admin">Admin</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </TableCell>
+                        <TableCell>{user.country || '-'}</TableCell>
                         <TableCell>{formatDate(user.createdAt)}</TableCell>
                         <TableCell>{formatDate(user.lastLogin)}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 text-red-600"
+                              onClick={() => confirmDelete(user, 'user')}
+                            >
                               <Trash2 className="w-4 h-4" />
                             </Button>
                           </div>
@@ -744,6 +970,7 @@ export default function Admin() {
             </Card>
           )}
 
+          {/* Plans Tab */}
           {activeTab === 'plans' && (
             <Card>
               <CardHeader>
@@ -759,20 +986,29 @@ export default function Admin() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>{language === 'ar' ? 'الاسم' : 'Name'}</TableHead>
+                      <TableHead>{language === 'ar' ? 'الاسم (عربي)' : 'Name (AR)'}</TableHead>
+                      <TableHead>{language === 'ar' ? 'الاسم (إنجليزي)' : 'Name (EN)'}</TableHead>
                       <TableHead>{language === 'ar' ? 'السعر' : 'Price'}</TableHead>
-                      <TableHead>{language === 'ar' ? 'المميزات' : 'Features'}</TableHead>
+                      <TableHead>{language === 'ar' ? 'الدورة' : 'Billing'}</TableHead>
+                      <TableHead>{language === 'ar' ? 'الرصيد' : 'Credits'}</TableHead>
                       <TableHead>{language === 'ar' ? 'الحالة' : 'Status'}</TableHead>
-                      <TableHead>{language === 'ar' ? 'تاريخ الإنشاء' : 'Created'}</TableHead>
                       <TableHead>{language === 'ar' ? 'إجراءات' : 'Actions'}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {plans.map((plan) => (
                       <TableRow key={plan.id}>
-                        <TableCell className="font-medium">{plan.name}</TableCell>
+                        <TableCell className="font-medium">{plan.name_ar || plan.name_en}</TableCell>
+                        <TableCell>{plan.name_en}</TableCell>
                         <TableCell>{formatCurrency(plan.price)}</TableCell>
-                        <TableCell className="max-w-xs truncate">{plan.features}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {plan.billing_cycle === 'monthly' 
+                              ? (language === 'ar' ? 'شهري' : 'Monthly')
+                              : (language === 'ar' ? 'سنوي' : 'Yearly')}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{plan.credits}</TableCell>
                         <TableCell>
                           <Badge variant={plan.is_active ? 'default' : 'secondary'}>
                             {plan.is_active 
@@ -781,7 +1017,6 @@ export default function Admin() {
                             }
                           </Badge>
                         </TableCell>
-                        <TableCell>{formatDate(plan.createdAt)}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <Button 
@@ -810,103 +1045,7 @@ export default function Admin() {
             </Card>
           )}
 
-          {activeTab === 'subscriptions' && (
-            <Card>
-              <CardHeader>
-                <CardTitle>{language === 'ar' ? 'الاشتراكات' : 'Subscriptions'}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{language === 'ar' ? 'المستخدم' : 'User'}</TableHead>
-                      <TableHead>{language === 'ar' ? 'الخطة' : 'Plan'}</TableHead>
-                      <TableHead>{language === 'ar' ? 'الحالة' : 'Status'}</TableHead>
-                      <TableHead>{language === 'ar' ? 'تاريخ البدء' : 'Start Date'}</TableHead>
-                      <TableHead>{language === 'ar' ? 'تاريخ الانتهاء' : 'End Date'}</TableHead>
-                      <TableHead>{language === 'ar' ? 'إجراءات' : 'Actions'}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {subscriptions.map((sub) => (
-                      <TableRow key={sub.id}>
-                        <TableCell>{sub.user_email}</TableCell>
-                        <TableCell>{sub.plan_id}</TableCell>
-                        <TableCell>
-                          <Badge variant={
-                            sub.status === 'active' ? 'default' : 
-                            sub.status === 'pending' ? 'secondary' : 'destructive'
-                          }>
-                            {sub.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{formatDate(sub.start_date)}</TableCell>
-                        <TableCell>{formatDate(sub.end_date)}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600">
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          )}
-
-          {activeTab === 'payments' && (
-            <Card>
-              <CardHeader>
-                <CardTitle>{language === 'ar' ? 'المدفوعات' : 'Payments'}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{language === 'ar' ? 'المستخدم' : 'User'}</TableHead>
-                      <TableHead>{language === 'ar' ? 'المبلغ' : 'Amount'}</TableHead>
-                      <TableHead>{language === 'ar' ? 'العملة' : 'Currency'}</TableHead>
-                      <TableHead>{language === 'ar' ? 'الحالة' : 'Status'}</TableHead>
-                      <TableHead>{language === 'ar' ? 'طريقة الدفع' : 'Method'}</TableHead>
-                      <TableHead>{language === 'ar' ? 'التاريخ' : 'Date'}</TableHead>
-                      <TableHead>{language === 'ar' ? 'إجراءات' : 'Actions'}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {payments.map((payment) => (
-                      <TableRow key={payment.id}>
-                        <TableCell>{payment.user_email}</TableCell>
-                        <TableCell className="font-medium">{formatCurrency(payment.amount)}</TableCell>
-                        <TableCell>{payment.currency}</TableCell>
-                        <TableCell>
-                          <Badge variant={
-                            payment.status === 'completed' ? 'default' : 
-                            payment.status === 'pending' ? 'secondary' : 'destructive'
-                          }>
-                            {payment.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{payment.payment_method || '-'}</TableCell>
-                        <TableCell>{formatDate(payment.createdAt)}</TableCell>
-                        <TableCell>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          )}
-
+          {/* Reviews Tab */}
           {activeTab === 'reviews' && (
             <Card>
               <CardHeader>
@@ -920,7 +1059,7 @@ export default function Admin() {
                       <TableHead>{language === 'ar' ? 'الوظيفة' : 'Job Title'}</TableHead>
                       <TableHead>{language === 'ar' ? 'التقييم' : 'Rating'}</TableHead>
                       <TableHead>{language === 'ar' ? 'التعليق' : 'Review'}</TableHead>
-                      <TableHead>{language === 'ar' ? 'التاريخ' : 'Date'}}</TableHead>
+                      <TableHead>{language === 'ar' ? 'التاريخ' : 'Date'}</TableHead>
                       <TableHead>{language === 'ar' ? 'الحالة' : 'Status'}</TableHead>
                       <TableHead>{language === 'ar' ? 'إجراءات' : 'Actions'}</TableHead>
                     </TableRow>
@@ -928,12 +1067,26 @@ export default function Admin() {
                   <TableBody>
                     {reviews.map((review) => (
                       <TableRow key={review.id}>
-                        <TableCell className="font-medium">{review.user_name}</TableCell>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            <Avatar className="h-8 w-8">
+                              <AvatarFallback>{getInitials(review.user_name)}</AvatarFallback>
+                            </Avatar>
+                            {review.user_name}
+                          </div>
+                        </TableCell>
                         <TableCell>{review.job_title}</TableCell>
                         <TableCell>
                           <div className="flex">
                             {[...Array(5)].map((_, i) => (
-                              <Star key={i} className={`w-4 h-4 ${i < review.rating ? 'fill-yellow-400 text-yellow-400' : 'text-slate-300'}`} />
+                              <Star 
+                                key={i} 
+                                className={`w-4 h-4 ${
+                                  i < review.rating 
+                                    ? 'fill-yellow-400 text-yellow-400' 
+                                    : 'text-slate-300'
+                                }`} 
+                              />
                             ))}
                           </div>
                         </TableCell>
@@ -946,10 +1099,35 @@ export default function Admin() {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600">
+                            {!review.is_approved && (
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8 text-green-600"
+                                onClick={() => handleUpdateReviewApproval(review.id, true)}
+                                title={language === 'ar' ? 'موافقة' : 'Approve'}
+                              >
+                                <CheckCircle className="w-4 h-4" />
+                              </Button>
+                            )}
+                            {review.is_approved && (
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8 text-orange-600"
+                                onClick={() => handleUpdateReviewApproval(review.id, false)}
+                                title={language === 'ar' ? 'إلغاء الموافقة' : 'Unapprove'}
+                              >
+                                <XCircle className="w-4 h-4" />
+                              </Button>
+                            )}
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 text-red-600"
+                              onClick={() => handleDeleteReview(review.id)}
+                              title={language === 'ar' ? 'حذف' : 'Delete'}
+                            >
                               <Trash2 className="w-4 h-4" />
                             </Button>
                           </div>
@@ -962,6 +1140,7 @@ export default function Admin() {
             </Card>
           )}
 
+          {/* Activity Logs Tab */}
           {activeTab === 'logs' && (
             <Card>
               <CardHeader>
@@ -974,31 +1153,216 @@ export default function Admin() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {activityLogs.map((log) => (
-                    <div key={log.id} className="flex items-start gap-4 p-4 bg-slate-50 dark:bg-slate-900 rounded-lg">
-                      <div className="w-8 h-8 bg-[#1995AD]/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <Activity className="w-4 h-4 text-[#1995AD]" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium text-slate-900 dark:text-white">{log.user_email}</span>
-                          <span className="text-xs text-slate-500">•</span>
-                          <span className="text-xs text-slate-500">{formatDate(log.timestamp)}</span>
+                <ScrollArea className="h-[600px]">
+                  <div className="space-y-4">
+                    {activityLogs.map((log) => (
+                      <div key={log.id} className="flex items-start gap-4 p-4 bg-slate-50 dark:bg-slate-900 rounded-lg">
+                        <div className="w-8 h-8 bg-[#1995AD]/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <Activity className="w-4 h-4 text-[#1995AD]" />
                         </div>
-                        <p className="text-slate-600 dark:text-slate-400">{log.action}</p>
-                        {log.details && (
-                          <p className="text-sm text-slate-500 dark:text-slate-500 mt-1">{log.details}</p>
-                        )}
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-medium text-slate-900 dark:text-white">{log.user_email}</span>
+                            <span className="text-xs text-slate-500">•</span>
+                            <span className="text-xs text-slate-500">{formatDate(log.timestamp)}</span>
+                          </div>
+                          <p className="text-slate-600 dark:text-slate-400">{log.action}</p>
+                          {log.details && (
+                            <p className="text-sm text-slate-500 dark:text-slate-500 mt-1">{log.details}</p>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                </ScrollArea>
               </CardContent>
             </Card>
           )}
         </div>
       </div>
+
+      {/* Notifications Dialog */}
+      <Dialog open={showNotificationsDialog} onOpenChange={setShowNotificationsDialog}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Bell className="w-5 h-5" />
+              {language === 'ar' ? 'الإشعارات' : 'Notifications'}
+              {unreadCount > 0 && (
+                <Badge variant="destructive" className="ml-2">
+                  {unreadCount} {language === 'ar' ? 'جديد' : 'new'}
+                </Badge>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          
+          <ScrollArea className="h-[400px] pr-4">
+            <div className="space-y-4">
+              {notifications.length === 0 ? (
+                <p className="text-center text-slate-500 py-8">
+                  {language === 'ar' ? 'لا توجد إشعارات' : 'No notifications'}
+                </p>
+              ) : (
+                notifications.map((notif) => (
+                  <div
+                    key={notif.id}
+                    className={`p-4 rounded-lg border ${
+                      notif.is_read 
+                        ? 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700'
+                        : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-medium text-slate-900 dark:text-white">
+                            {notif.title?.[language] || notif.title?.en}
+                          </span>
+                          <span className="text-xs text-slate-500">
+                            {formatDate(notif.created_at)}
+                          </span>
+                        </div>
+                        <p className="text-sm text-slate-600 dark:text-slate-400">
+                          {notif.message?.[language] || notif.message?.en}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {!notif.is_read && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => handleMarkAsRead(notif.id)}
+                          >
+                            <CheckSquare className="w-4 h-4" />
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-red-600"
+                          onClick={() => handleDeleteNotification(notif.id)}
+                        >
+                          <XSquare className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* User Modal */}
+      <Dialog open={showUserModal} onOpenChange={setShowUserModal}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {editingUser 
+                ? (language === 'ar' ? 'تعديل المستخدم' : 'Edit User')
+                : (language === 'ar' ? 'إضافة مستخدم جديد' : 'Add New User')
+              }
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
+            <div className="space-y-2">
+              <Label>{language === 'ar' ? 'الاسم الكامل' : 'Full Name'} *</Label>
+              <Input
+                value={userForm.full_name}
+                onChange={(e) => setUserForm({ ...userForm, full_name: e.target.value })}
+                placeholder={language === 'ar' ? 'أدخل الاسم الكامل' : 'Enter full name'}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Email *</Label>
+              <Input
+                type="email"
+                value={userForm.email}
+                onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
+                placeholder="email@example.com"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label>{language === 'ar' ? 'كلمة المرور' : 'Password'} *</Label>
+              <Input
+                type="password"
+                value={userForm.password}
+                onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
+                placeholder="******"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label>{language === 'ar' ? 'رقم الهاتف' : 'Phone'}</Label>
+              <Input
+                value={userForm.phone}
+                onChange={(e) => setUserForm({ ...userForm, phone: e.target.value })}
+                placeholder={language === 'ar' ? 'أدخل رقم الهاتف' : 'Enter phone'}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label>{language === 'ar' ? 'الدور' : 'Role'}</Label>
+              <Select 
+                value={userForm.role} 
+                onValueChange={(v) => setUserForm({ ...userForm, role: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="user">User</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <Separator />
+            
+            <div className="space-y-2">
+              <Label>{language === 'ar' ? 'الدولة' : 'Country'}</Label>
+              <Input
+                value={userForm.country}
+                onChange={(e) => setUserForm({ ...userForm, country: e.target.value })}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label>{language === 'ar' ? 'المدينة' : 'City'}</Label>
+              <Input
+                value={userForm.city}
+                onChange={(e) => setUserForm({ ...userForm, city: e.target.value })}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label>{language === 'ar' ? 'اسم الشركة' : 'Business Name'}</Label>
+              <Input
+                value={userForm.business_name}
+                onChange={(e) => setUserForm({ ...userForm, business_name: e.target.value })}
+              />
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowUserModal(false)}>
+              {language === 'ar' ? 'إلغاء' : 'Cancel'}
+            </Button>
+            <Button 
+              onClick={handleAddUser}
+              className="bg-[#1995AD] hover:bg-[#1995AD]/90"
+            >
+              <Save className="w-4 h-4 mr-2" />
+              {language === 'ar' ? 'حفظ' : 'Save'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Plan Modal */}
       <Dialog open={showPlanModal} onOpenChange={setShowPlanModal}>
@@ -1012,50 +1376,128 @@ export default function Admin() {
             </DialogTitle>
           </DialogHeader>
           
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
             <div className="space-y-2">
-              <Label>{language === 'ar' ? 'اسم الخطة' : 'Plan Name'} *</Label>
+              <Label>{language === 'ar' ? 'اسم الخطة (عربي)' : 'Plan Name (Arabic)'} *</Label>
               <Input
-                value={planForm.name}
-                onChange={(e) => setPlanForm({ ...planForm, name: e.target.value })}
+                value={planForm.name_ar}
+                onChange={(e) => setPlanForm({ ...planForm, name_ar: e.target.value })}
                 placeholder={language === 'ar' ? 'مثال: الخطة الأساسية' : 'e.g. Basic Plan'}
               />
             </div>
             
             <div className="space-y-2">
-              <Label>{language === 'ar' ? 'السعر' : 'Price'} *</Label>
+              <Label>{language === 'ar' ? 'اسم الخطة (إنجليزي)' : 'Plan Name (English)'} *</Label>
               <Input
-                type="number"
-                value={planForm.price}
-                onChange={(e) => setPlanForm({ ...planForm, price: e.target.value })}
-                placeholder="0.00"
-                min="0"
-                step="0.01"
+                value={planForm.name_en}
+                onChange={(e) => setPlanForm({ ...planForm, name_en: e.target.value })}
+                placeholder="e.g. Basic Plan"
+              />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>{language === 'ar' ? 'السعر (USD)' : 'Price (USD)'} *</Label>
+                <Input
+                  type="number"
+                  value={planForm.price}
+                  onChange={(e) => setPlanForm({ ...planForm, price: e.target.value })}
+                  placeholder="0.00"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label>{language === 'ar' ? 'دورة الفوترة' : 'Billing Cycle'}</Label>
+                <Select 
+                  value={planForm.billing_cycle} 
+                  onValueChange={(v) => setPlanForm({ ...planForm, billing_cycle: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="monthly">
+                      {language === 'ar' ? 'شهري' : 'Monthly'}
+                    </SelectItem>
+                    <SelectItem value="yearly">
+                      {language === 'ar' ? 'سنوي' : 'Yearly'}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>{language === 'ar' ? 'الرصيد' : 'Credits'} *</Label>
+                <Input
+                  type="number"
+                  value={planForm.credits}
+                  onChange={(e) => setPlanForm({ ...planForm, credits: e.target.value })}
+                  placeholder="100"
+                  min="0"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label>{language === 'ar' ? 'الرموز لكل سؤال' : 'Tokens/Question'}</Label>
+                <Input
+                  type="number"
+                  value={planForm.tokens_per_question}
+                  onChange={(e) => setPlanForm({ ...planForm, tokens_per_question: e.target.value })}
+                  placeholder="500"
+                  min="0"
+                />
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <Label>{language === 'ar' ? 'المميزات (عربي)' : 'Features (Arabic)'}</Label>
+              <Textarea
+                value={planForm.features_ar}
+                onChange={(e) => setPlanForm({ ...planForm, features_ar: e.target.value })}
+                placeholder={language === 'ar' ? 'أدخل المميزات (مفصولة بفواصل)' : 'Enter features (comma separated)'}
+                rows={3}
               />
             </div>
             
             <div className="space-y-2">
-              <Label>{language === 'ar' ? 'المميزات' : 'Features'} *</Label>
+              <Label>{language === 'ar' ? 'المميزات (إنجليزي)' : 'Features (English)'}</Label>
               <Textarea
-                value={planForm.features}
-                onChange={(e) => setPlanForm({ ...planForm, features: e.target.value })}
-                placeholder={language === 'ar' ? 'أدخل المميزات (مفصولة بفواصل)' : 'Enter features (comma separated)'}
-                rows={4}
+                value={planForm.features_en}
+                onChange={(e) => setPlanForm({ ...planForm, features_en: e.target.value })}
+                placeholder="Enter features (comma separated)"
+                rows={3}
               />
             </div>
             
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="is_active"
-                checked={planForm.is_active}
-                onCheckedChange={(checked) => setPlanForm({ ...planForm, is_active: checked })}
-              />
-              <label
-                htmlFor="is_active"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-              >
-                {language === 'ar' ? 'الخطة نشطة' : 'Plan is active'}
-              </label>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="is_active"
+                  checked={planForm.is_active}
+                  onCheckedChange={(checked) => setPlanForm({ ...planForm, is_active: checked })}
+                />
+                <label
+                  htmlFor="is_active"
+                  className="text-sm font-medium leading-none"
+                >
+                  {language === 'ar' ? 'الخطة نشطة' : 'Plan is active'}
+                </label>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <Label>{language === 'ar' ? 'الترتيب' : 'Order'}</Label>
+                <Input
+                  type="number"
+                  value={planForm.order}
+                  onChange={(e) => setPlanForm({ ...planForm, order: e.target.value })}
+                  className="w-20"
+                  min="0"
+                />
+              </div>
             </div>
           </div>
           
@@ -1086,7 +1528,7 @@ export default function Admin() {
             </AlertDialogTitle>
             <AlertDialogDescription>
               {language === 'ar' 
-                ? `هل أنت متأكد من حذف ${deleteType === 'plan' ? 'الخطة' : 'العنصر'} "${selectedItem?.name || selectedItem?.full_name || ''}"؟`
+                ? `هل أنت متأكد من حذف ${deleteType === 'plan' ? 'الخطة' : deleteType === 'user' ? 'المستخدم' : 'التقييم'} "${selectedItem?.name || selectedItem?.name_en || selectedItem?.full_name || ''}"؟`
                 : `Are you sure you want to delete this ${deleteType}?`
               }
             </AlertDialogDescription>
@@ -1095,7 +1537,14 @@ export default function Admin() {
             <AlertDialogCancel>
               {language === 'ar' ? 'إلغاء' : 'Cancel'}
             </AlertDialogCancel>
-            <AlertDialogAction onClick={deleteType === 'plan' ? handleDeletePlan : null} className="bg-red-600 hover:bg-red-700">
+            <AlertDialogAction 
+              onClick={
+                deleteType === 'plan' ? handleDeletePlan : 
+                deleteType === 'user' ? handleDeleteUser : 
+                confirmDeleteReview
+              } 
+              className="bg-red-600 hover:bg-red-700"
+            >
               {language === 'ar' ? 'حذف' : 'Delete'}
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -1104,4 +1553,3 @@ export default function Admin() {
     </div>
   );
 }
-
