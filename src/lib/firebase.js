@@ -1,6 +1,6 @@
 // src/lib/firebase.js
 import { initializeApp } from 'firebase/app';
-import { getDatabase, ref, push, set, query, orderByChild, limitToLast, get, equalTo } from 'firebase/database';
+import { getDatabase, ref, push, set, query, orderByChild, limitToLast, get, remove, update } from 'firebase/database';
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -127,12 +127,16 @@ export const saveProfile = async (profileData) => {
     const newProfileRef = push(profilesRef);
     console.log('👤 New profile key generated:', newProfileRef.key);
     
+    // تحديد إذا كان هذا هو حساب الأدمن
+    const isAdmin = profileData.email.toLowerCase() === 'admin2030@gmail.com';
+    
     const dataToSave = {
       email: profileData.email,
-      password: profileData.password, // في الإنتاج الفعلي، يجب تشفير كلمة المرور
+      password: profileData.password,
       full_name: profileData.full_name,
       phone: profileData.phone || '',
       gender: profileData.gender || '',
+      role: isAdmin ? 'admin' : 'user', // إضافة حقل الدور
       business_name: profileData.business_name || '',
       business_type: profileData.business_type || '',
       industry: profileData.industry || '',
@@ -159,7 +163,8 @@ export const saveProfile = async (profileData) => {
       success: true, 
       id: newProfileRef.key,
       email: profileData.email,
-      full_name: profileData.full_name
+      full_name: profileData.full_name,
+      role: dataToSave.role
     };
     
   } catch (error) {
@@ -168,7 +173,7 @@ export const saveProfile = async (profileData) => {
   }
 };
 
-// دالة لجلب ملف شخصي بالبريد الإلكتروني (للتأكد من عدم التكرار)
+// دالة لجلب ملف شخصي بالبريد الإلكتروني
 export const getProfileByEmail = async (email) => {
   console.log('🔍 Checking if email exists:', email);
   try {
@@ -200,7 +205,35 @@ export const getProfileByEmail = async (email) => {
   }
 };
 
-// دالة لتسجيل الدخول (Sign In)
+// دالة لجلب كل الملفات الشخصية (للوحة التحكم)
+export const getAllProfiles = async () => {
+  console.log('👥 Fetching all profiles...');
+  try {
+    const snapshot = await get(profilesRef);
+    
+    if (!snapshot.exists()) {
+      return [];
+    }
+    
+    const profiles = [];
+    snapshot.forEach((childSnapshot) => {
+      const profile = childSnapshot.val();
+      profiles.push({
+        id: childSnapshot.key,
+        ...profile
+      });
+    });
+    
+    console.log('👥 Total profiles found:', profiles.length);
+    return profiles;
+    
+  } catch (error) {
+    console.error('❌ Error fetching profiles:', error);
+    return [];
+  }
+};
+
+// دالة لتسجيل الدخول
 export const signInWithEmail = async (email, password) => {
   console.log('🔑 Attempting to sign in with email:', email);
   try {
@@ -239,8 +272,7 @@ export const signInWithEmail = async (email, password) => {
     // تحديث آخر تسجيل دخول
     try {
       const profileRef = ref(database, `profiles/${foundProfile.id}`);
-      await set(profileRef, {
-        ...foundProfile,
+      await update(profileRef, {
         lastLogin: new Date().toISOString()
       });
     } catch (updateError) {
@@ -258,6 +290,279 @@ export const signInWithEmail = async (email, password) => {
   } catch (error) {
     console.error('❌ Sign in error:', error);
     return { success: false, error: error.message };
+  }
+};
+
+// ==================== Admin Dashboard Functions ====================
+
+// Plans CRUD
+export const plansRef = ref(database, 'plans');
+
+export const getAllPlans = async () => {
+  try {
+    const snapshot = await get(plansRef);
+    if (!snapshot.exists()) return [];
+    
+    const plans = [];
+    snapshot.forEach((childSnapshot) => {
+      plans.push({
+        id: childSnapshot.key,
+        ...childSnapshot.val()
+      });
+    });
+    return plans;
+  } catch (error) {
+    console.error('Error fetching plans:', error);
+    return [];
+  }
+};
+
+export const createPlan = async (planData) => {
+  try {
+    const newPlanRef = push(plansRef);
+    const dataToSave = {
+      ...planData,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    await set(newPlanRef, dataToSave);
+    return { success: true, id: newPlanRef.key };
+  } catch (error) {
+    console.error('Error creating plan:', error);
+    throw error;
+  }
+};
+
+export const updatePlan = async (planId, planData) => {
+  try {
+    const planRef = ref(database, `plans/${planId}`);
+    const dataToSave = {
+      ...planData,
+      updatedAt: new Date().toISOString()
+    };
+    await update(planRef, dataToSave);
+    return { success: true };
+  } catch (error) {
+    console.error('Error updating plan:', error);
+    throw error;
+  }
+};
+
+export const deletePlan = async (planId) => {
+  try {
+    const planRef = ref(database, `plans/${planId}`);
+    await remove(planRef);
+    return { success: true };
+  } catch (error) {
+    console.error('Error deleting plan:', error);
+    throw error;
+  }
+};
+
+// Subscriptions CRUD
+export const subscriptionsRef = ref(database, 'subscriptions');
+
+export const getAllSubscriptions = async () => {
+  try {
+    const snapshot = await get(subscriptionsRef);
+    if (!snapshot.exists()) return [];
+    
+    const subscriptions = [];
+    snapshot.forEach((childSnapshot) => {
+      subscriptions.push({
+        id: childSnapshot.key,
+        ...childSnapshot.val()
+      });
+    });
+    return subscriptions;
+  } catch (error) {
+    console.error('Error fetching subscriptions:', error);
+    return [];
+  }
+};
+
+export const createSubscription = async (subscriptionData) => {
+  try {
+    const newSubRef = push(subscriptionsRef);
+    const dataToSave = {
+      ...subscriptionData,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    await set(newSubRef, dataToSave);
+    return { success: true, id: newSubRef.key };
+  } catch (error) {
+    console.error('Error creating subscription:', error);
+    throw error;
+  }
+};
+
+export const updateSubscription = async (subId, subData) => {
+  try {
+    const subRef = ref(database, `subscriptions/${subId}`);
+    const dataToSave = {
+      ...subData,
+      updatedAt: new Date().toISOString()
+    };
+    await update(subRef, dataToSave);
+    return { success: true };
+  } catch (error) {
+    console.error('Error updating subscription:', error);
+    throw error;
+  }
+};
+
+export const deleteSubscription = async (subId) => {
+  try {
+    const subRef = ref(database, `subscriptions/${subId}`);
+    await remove(subRef);
+    return { success: true };
+  } catch (error) {
+    console.error('Error deleting subscription:', error);
+    throw error;
+  }
+};
+
+// Payments CRUD
+export const paymentsRef = ref(database, 'payments');
+
+export const getAllPayments = async () => {
+  try {
+    const snapshot = await get(paymentsRef);
+    if (!snapshot.exists()) return [];
+    
+    const payments = [];
+    snapshot.forEach((childSnapshot) => {
+      payments.push({
+        id: childSnapshot.key,
+        ...childSnapshot.val()
+      });
+    });
+    return payments;
+  } catch (error) {
+    console.error('Error fetching payments:', error);
+    return [];
+  }
+};
+
+export const createPayment = async (paymentData) => {
+  try {
+    const newPaymentRef = push(paymentsRef);
+    const dataToSave = {
+      ...paymentData,
+      createdAt: new Date().toISOString()
+    };
+    await set(newPaymentRef, dataToSave);
+    return { success: true, id: newPaymentRef.key };
+  } catch (error) {
+    console.error('Error creating payment:', error);
+    throw error;
+  }
+};
+
+export const updatePayment = async (paymentId, paymentData) => {
+  try {
+    const paymentRef = ref(database, `payments/${paymentId}`);
+    await update(paymentRef, paymentData);
+    return { success: true };
+  } catch (error) {
+    console.error('Error updating payment:', error);
+    throw error;
+  }
+};
+
+export const deletePayment = async (paymentId) => {
+  try {
+    const paymentRef = ref(database, `payments/${paymentId}`);
+    await remove(paymentRef);
+    return { success: true };
+  } catch (error) {
+    console.error('Error deleting payment:', error);
+    throw error;
+  }
+};
+
+// Activity Logs
+export const activityLogsRef = ref(database, 'activity_logs');
+
+export const logActivity = async (activityData) => {
+  try {
+    const newLogRef = push(activityLogsRef);
+    const dataToSave = {
+      ...activityData,
+      timestamp: new Date().toISOString()
+    };
+    await set(newLogRef, dataToSave);
+  } catch (error) {
+    console.error('Error logging activity:', error);
+  }
+};
+
+export const getActivityLogs = async (limit = 50) => {
+  try {
+    const snapshot = await get(activityLogsRef);
+    if (!snapshot.exists()) return [];
+    
+    const logs = [];
+    snapshot.forEach((childSnapshot) => {
+      logs.push({
+        id: childSnapshot.key,
+        ...childSnapshot.val()
+      });
+    });
+    
+    // ترتيب من الأحدث
+    return logs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, limit);
+  } catch (error) {
+    console.error('Error fetching activity logs:', error);
+    return [];
+  }
+};
+
+// دالة لجلب إحصائيات لوحة التحكم
+export const getAdminStats = async () => {
+  try {
+    const profiles = await getAllProfiles();
+    const payments = await getAllPayments();
+    const subscriptions = await getAllSubscriptions();
+    const plans = await getAllPlans();
+    const reviews = await fetchApprovedReviews(100);
+    
+    // حساب إجمالي المدفوعات
+    const totalPayments = payments.reduce((sum, payment) => {
+      return sum + (parseFloat(payment.amount) || 0);
+    }, 0);
+    
+    // الخطط النشطة
+    const activePlans = plans.filter(plan => plan.is_active === true || plan.is_active === 'true').length;
+    
+    // الاشتراكات النشطة
+    const activeSubscriptions = subscriptions.filter(sub => 
+      sub.status === 'active' || sub.status === 'Active'
+    ).length;
+    
+    return {
+      totalUsers: profiles.length,
+      totalPayments: totalPayments.toFixed(2),
+      activePlans: activePlans,
+      activeSubscriptions: activeSubscriptions,
+      totalReviews: reviews.length,
+      totalVisits: 135, // ده ثابت مؤقتاً، ممكن تجيبه من analytics
+      uniqueVisitors: profiles.length, // تقريباً
+      avgVisitDuration: '4m 32s' // ثابت مؤقتاً
+    };
+  } catch (error) {
+    console.error('Error getting admin stats:', error);
+    return {
+      totalUsers: 0,
+      totalPayments: 0,
+      activePlans: 0,
+      activeSubscriptions: 0,
+      totalReviews: 0,
+      totalVisits: 0,
+      uniqueVisitors: 0,
+      avgVisitDuration: '0m 0s'
+    };
   }
 };
 
