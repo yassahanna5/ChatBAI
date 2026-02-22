@@ -58,7 +58,7 @@ import Reviews from './pages/Reviews';
 import Settings from './pages/Settings';
 import Support from './pages/Support';
 import __Layout from './Layout.jsx';
-
+import SignIn from './pages/SignIn';
 
 export const PAGES = {
     "Admin": Admin,
@@ -70,6 +70,7 @@ export const PAGES = {
     "Register": Register,
     "Reviews": Reviews,
     "Settings": Settings,
+    "SignIn": SignIn,
     "Support": Support,
 }
 
@@ -77,4 +78,5 @@ export const pagesConfig = {
     mainPage: "Home",
     Pages: PAGES,
     Layout: __Layout,
+
 };
