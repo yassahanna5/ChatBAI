@@ -120,7 +120,6 @@ export default function Register() {
   const handleNextStep = async () => {
     if (!validatePersonalData()) return;
     
-    // Check if email already exists
     setLoading(true);
     try {
       const existingProfile = await getProfileByEmail(personalData.email);
@@ -160,19 +159,14 @@ export default function Register() {
       
       console.log('✅ Registration successful:', result);
       
-      // تخزين بيانات المستخدم في sessionStorage مؤقتاً
-      sessionStorage.setItem('currentUser', JSON.stringify({
-        email: result.email,
-        full_name: result.full_name,
-        id: result.id
-      }));
-      
+      // ❌ مش بنخزن في sessionStorage هنا
+      // ✅ بنوجه المستخدم لصفحة تسجيل الدخول
       alert(language === 'ar' 
-        ? 'تم إنشاء الحساب بنجاح! سيتم توجيهك إلى لوحة التحكم.'
-        : 'Account created successfully! You will be redirected to dashboard.');
+        ? 'تم إنشاء الحساب بنجاح! الرجاء تسجيل الدخول.'
+        : 'Account created successfully! Please sign in.');
       
-      // التوجيه إلى صفحة الدردشة
-      navigate(createPageUrl('Chat'));
+      // التوجيه إلى صفحة تسجيل الدخول
+      navigate(createPageUrl('SignIn'));
       
     } catch (error) {
       console.error('❌ Registration error:', error);
