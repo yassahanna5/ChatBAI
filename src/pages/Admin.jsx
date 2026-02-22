@@ -32,6 +32,8 @@ import {
   Monitor,
   Clock,
   BarChart3,
+  Sun,      // 👈 أضف ده
+  Moon,      // 👈 أضف ده
   Download
 } from 'lucide-react';
 import { useLanguage } from '@/components/LanguageContext';
@@ -1102,3 +1104,4 @@ export default function Admin() {
     </div>
   );
 }
+
