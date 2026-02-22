@@ -67,10 +67,19 @@ export default function Home() {
       
       // التحقق من أن البيانات مصفوفة
       if (Array.isArray(reviewsData)) {
-        setReviews(reviewsData);
+        // فلترة التقييمات التي ليس بها أخطاء
+        const validReviews = reviewsData.filter(review => 
+          review && 
+          review.user_name && 
+          review.review_text && 
+          review.rating
+        );
+        
+        console.log('📍 Valid reviews after filtering:', validReviews.length);
+        setReviews(validReviews);
         
         // إذا في تقييمات موجودة، اعرض أول واحد
-        if (reviewsData.length > 0) {
+        if (validReviews.length > 0) {
           setCurrentReviewIndex(0);
         }
       } else {
@@ -149,6 +158,15 @@ export default function Home() {
   };
 
   const currentReview = getCurrentReview();
+
+  // دالة لعرض النجوم بشكل آمن
+  const renderStars = (rating) => {
+    if (!rating) return null;
+    const starCount = Math.min(5, parseInt(rating) || 0);
+    return [...Array(starCount)].map((_, j) => (
+      <Star key={j} className="w-6 h-6 fill-yellow-400 text-yellow-400" />
+    ));
+  };
 
   return (
     <div className={`min-h-screen bg-gradient-to-br from-[#F1F1F2] via-white to-[#A1D6E2]/20 dark:from-slate-950 dark:via-slate-900 dark:to-[#1995AD]/20 ${isRtl ? 'rtl' : 'ltr'}`}>
@@ -396,11 +414,7 @@ export default function Home() {
                   className="bg-white dark:bg-slate-800 rounded-2xl p-8 shadow-lg"
                 >
                   <div className="flex gap-1 mb-4 justify-center">
-                    {currentReview.rating && 
-                      [...Array(Math.min(5, currentReview.rating))].map((_, j) => (
-                        <Star key={j} className="w-6 h-6 fill-yellow-400 text-yellow-400" />
-                      ))
-                    }
+                    {renderStars(currentReview.rating)}
                   </div>
                   <p className="text-slate-700 dark:text-slate-300 mb-6 italic text-center text-lg">
                     "{currentReview.review_text || ''}"
@@ -412,6 +426,14 @@ export default function Home() {
                     <p className="text-slate-500 dark:text-slate-400">
                       {currentReview.job_title || ''}
                     </p>
+                    {currentReview.createdAt && (
+                      <p className="text-slate-400 dark:text-slate-500 text-sm mt-2">
+                        {new Date(currentReview.createdAt).toLocaleDateString(
+                          language === 'ar' ? 'ar-EG' : 'en-US',
+                          { year: 'numeric', month: 'long', day: 'numeric' }
+                        )}
+                      </p>
+                    )}
                   </div>
                 </motion.div>
               </AnimatePresence>
@@ -455,13 +477,6 @@ export default function Home() {
           ) : (
             <div className="text-center text-slate-500 dark:text-slate-400 py-12">
               {language === 'ar' ? 'لا توجد تقييمات حتى الآن' : 'No reviews yet'}
-              <div className="mt-4">
-                <Link to={createPageUrl('Reviews')}>
-                  <Button variant="outline" className="mt-2">
-                    {language === 'ar' ? 'كن أول من يقيم' : 'Be the first to review'}
-                  </Button>
-                </Link>
-              </div>
             </div>
           )}
         </div>
