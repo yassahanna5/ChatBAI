@@ -160,17 +160,7 @@ export const updateUser = async (userId, userData) => {
   }
 };
 
-// دالة لحذف مستخدم
-export const deleteUser = async (userId) => {
-  try {
-    const userRef = ref(database, `users/${userId}`);
-    await remove(userRef);
-    return { success: true };
-  } catch (error) {
-    console.error('Error deleting user:', error);
-    return { success: false };
-  }
-};
+
 
 // أضف هذه الدوال في قسم Users Functions (بعد دوال users الموجودة)
 
