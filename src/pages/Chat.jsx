@@ -32,7 +32,7 @@ const MODEL_ICONS = {
 // ==================== مفاتيح API ====================
 const OPENROUTER_API_KEYS = {
   DEEPSEEK: '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',
-  STEPFUN: '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',
+  STEPFUN: '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',
   MISTRAL: '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',
   QWEN: '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'
 };
@@ -791,3 +791,4 @@ Respond in ${language === 'ar' ? 'Arabic' : 'English'}.`;
     </div>
   );
 }
+
