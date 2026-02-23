@@ -45,7 +45,7 @@ export default function Home() {
         return;
       }
 
-      // 2. إذا مش موجود في sessionStorage، نتحقق من Base44 auth
+      // 2. إذا مش موجود في sessionStorage، نتحقق من Base44 auth (للمستخدمين القدامى)
       const isAuth = await base44.auth.isAuthenticated();
       if (isAuth) {
         const base44User = await base44.auth.me();
@@ -80,7 +80,7 @@ export default function Home() {
     
     setLoadingNotifs(true);
     try {
-      // جلب إشعارات المستخدم
+      // جلب إشعارات المستخدم من Firebase
       const userNotifs = await getUserNotifications(user.email);
       setNotifications(userNotifs);
       
@@ -265,6 +265,18 @@ export default function Home() {
     }
   };
 
+  // إغلاق القائمة المنسدلة عند الضغط خارجها
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showNotifications && !event.target.closest('.notifications-container')) {
+        setShowNotifications(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showNotifications]);
+
   return (
     <div className={`min-h-screen bg-gradient-to-br from-[#F1F1F2] via-white to-[#A1D6E2]/20 dark:from-slate-950 dark:via-slate-900 dark:to-[#1995AD]/20 ${isRtl ? 'rtl' : 'ltr'}`}>
       {/* Navigation */}
@@ -295,9 +307,9 @@ export default function Home() {
                 {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
               </button>
 
-              {/* Notifications - للمستخدم المسجل */}
+              {/* Notifications - للمستخدم المسجل - من Firebase ✅ */}
               {user && (
-                <div className="relative">
+                <div className="relative notifications-container">
                   <button
                     onClick={() => setShowNotifications(!showNotifications)}
                     className="relative p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors flex-shrink-0"
@@ -308,7 +320,7 @@ export default function Home() {
                     )}
                   </button>
 
-                  {/* Notifications Dropdown */}
+                  {/* Notifications Dropdown - من Firebase */}
                   {showNotifications && (
                     <div className="absolute top-12 right-0 w-80 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 z-50">
                       <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
@@ -327,7 +339,8 @@ export default function Home() {
                         )}
                       </div>
                       
-                      <ScrollArea className="max-h-96 overflow-y-auto">
+                      {/* ✅ استخدم div بدلاً من ScrollArea */}
+                      <div className="max-h-96 overflow-y-auto">
                         {loadingNotifs ? (
                           <div className="flex justify-center py-8">
                             <Loader2 className="w-6 h-6 animate-spin text-[#1995AD]" />
@@ -341,7 +354,7 @@ export default function Home() {
                             {notifications.map((notif) => (
                               <div
                                 key={notif.id}
-                                className={`p-4 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${
+                                className={`p-4 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors cursor-pointer ${
                                   !notif.is_read ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''
                                 }`}
                                 onClick={() => !notif.is_read && handleMarkAsRead(notif.id)}
@@ -374,7 +387,7 @@ export default function Home() {
                             ))}
                           </div>
                         )}
-                      </ScrollArea>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -439,7 +452,7 @@ export default function Home() {
         </div>
       </nav>
 
-      {/* باقي الكود (Hero Section, Features, Testimonials, Footer) كما هو */}
+      {/* Add padding top to account for fixed navbar */}
       <div className="pt-20"></div>
 
       {/* Hero Image Section */}
