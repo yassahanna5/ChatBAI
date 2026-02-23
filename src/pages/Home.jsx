@@ -7,7 +7,7 @@ import { Bot, BarChart3, Target, Zap, ArrowRight, CheckCircle, TrendingUp, FileT
 import { useLanguage } from '@/components/LanguageContext';
 import { useTheme } from '@/components/ThemeContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { getAllReviews, getUserByEmail } from '@/lib/firebase';
+import { getAllReviews, getUserByEmail, getUserNotifications, markNotificationAsRead, getUnreadNotificationsCount } from '@/lib/firebase';
 
 export default function Home() {
   const { t, language, changeLanguage, isRtl } = useLanguage();
@@ -19,11 +19,20 @@ export default function Home() {
   const [currentReviewIndex, setCurrentReviewIndex] = useState(0);
   const [loadingReviews, setLoadingReviews] = useState(true);
   const [reviewsError, setReviewsError] = useState(null);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [loadingNotifs, setLoadingNotifs] = useState(false);
 
   useEffect(() => {
     checkAuth();
     loadReviews();
   }, []);
+
+  useEffect(() => {
+    if (user?.email) {
+      loadUserNotifications();
+    }
+  }, [user]);
 
   const checkAuth = async () => {
     try {
@@ -33,19 +42,6 @@ export default function Home() {
         const parsedUser = JSON.parse(sessionUser);
         setUser(parsedUser);
         setIsAdmin(parsedUser.role === 'admin');
-        
-        // جلب الإشعارات إذا كان مستخدم
-        try {
-          if (parsedUser.email && base44.entities?.Notification?.filter) {
-            const notifs = await base44.entities.Notification.filter({ 
-              user_email: parsedUser.email, 
-              is_read: false 
-            });
-            setUnreadNotifs(Array.isArray(notifs) ? notifs.length : 0);
-          }
-        } catch (error) {
-          console.error('Error fetching notifications:', error);
-        }
         return;
       }
 
@@ -56,14 +52,14 @@ export default function Home() {
         
         // 3. نجيب بيانات المستخدم من Firebase باستخدام الإيميل
         if (base44User && base44User.email) {
-          const firebaseProfile = await getUserByEmail(base44User.email);
+          const firebaseUser = await getUserByEmail(base44User.email);
           
-          if (firebaseProfile) {
+          if (firebaseUser) {
             const userData = {
-              email: firebaseProfile.email,
-              full_name: firebaseProfile.full_name,
-              id: firebaseProfile.id,
-              role: firebaseProfile.role || 'user'
+              email: firebaseUser.email,
+              full_name: firebaseUser.full_name,
+              id: firebaseUser.id,
+              role: firebaseUser.role || 'user'
             };
             
             setUser(userData);
@@ -71,25 +67,51 @@ export default function Home() {
             
             // نخزن في sessionStorage للاستخدام المستقبلي
             sessionStorage.setItem('currentUser', JSON.stringify(userData));
-            
-            // جلب الإشعارات
-            try {
-              if (base44.entities?.Notification?.filter) {
-                const notifs = await base44.entities.Notification.filter({ 
-                  user_email: userData.email, 
-                  is_read: false 
-                });
-                setUnreadNotifs(Array.isArray(notifs) ? notifs.length : 0);
-              }
-            } catch (error) {
-              console.error('Error fetching notifications:', error);
-            }
           }
         }
       }
     } catch (error) {
       console.error('Auth error:', error);
-      setUnreadNotifs(0);
+    }
+  };
+
+  const loadUserNotifications = async () => {
+    if (!user?.email) return;
+    
+    setLoadingNotifs(true);
+    try {
+      // جلب إشعارات المستخدم
+      const userNotifs = await getUserNotifications(user.email);
+      setNotifications(userNotifs);
+      
+      // حساب عدد الإشعارات غير المقروءة
+      const unreadCount = await getUnreadNotificationsCount(user.email);
+      setUnreadNotifs(unreadCount);
+    } catch (error) {
+      console.error('Error loading notifications:', error);
+    } finally {
+      setLoadingNotifs(false);
+    }
+  };
+
+  const handleMarkAsRead = async (notificationId) => {
+    await markNotificationAsRead(notificationId);
+    // تحديث القائمة بعد تحديد الإشعار كمقروء
+    loadUserNotifications();
+  };
+
+  const handleMarkAllAsRead = async () => {
+    if (!user?.email) return;
+    
+    try {
+      // تحديد كل الإشعارات غير المقروءة كمقروءة
+      const unreadNotifs = notifications.filter(n => !n.is_read);
+      for (const notif of unreadNotifs) {
+        await markNotificationAsRead(notif.id);
+      }
+      loadUserNotifications();
+    } catch (error) {
+      console.error('Error marking all as read:', error);
     }
   };
 
@@ -105,17 +127,19 @@ export default function Home() {
       console.log('📍 Number of reviews:', reviewsData.length);
       
       if (Array.isArray(reviewsData)) {
-        const validReviews = reviewsData.filter(review => 
+        // فلترة التقييمات المعتمدة فقط
+        const approvedReviews = reviewsData.filter(review => 
           review && 
+          review.is_approved === true &&
           review.user_name && 
           review.review_text && 
           review.rating
         );
         
-        console.log('📍 Valid reviews after filtering:', validReviews.length);
-        setReviews(validReviews);
+        console.log('📍 Approved reviews after filtering:', approvedReviews.length);
+        setReviews(approvedReviews);
         
-        if (validReviews.length > 0) {
+        if (approvedReviews.length > 0) {
           setCurrentReviewIndex(0);
         }
       } else {
@@ -143,6 +167,8 @@ export default function Home() {
       
       setUser(null);
       setIsAdmin(false);
+      setNotifications([]);
+      setUnreadNotifs(0);
       
       // توجيه للصفحة الرئيسية
       window.location.href = '/';
@@ -208,6 +234,37 @@ export default function Home() {
     ));
   };
 
+  // الحصول على نص الإشعار حسب اللغة
+  const getNotificationText = (notif) => {
+    if (language === 'ar') {
+      return notif.message_ar || notif.message_en;
+    }
+    return notif.message_en;
+  };
+
+  const getNotificationTitle = (notif) => {
+    if (language === 'ar') {
+      return notif.title_ar || notif.title_en;
+    }
+    return notif.title_en;
+  };
+
+  // أيقونة حسب نوع الإشعار
+  const getNotificationIcon = (type) => {
+    switch(type) {
+      case 'welcome':
+        return '👋';
+      case 'credits':
+        return '🎉';
+      case 'subscription':
+        return '⭐';
+      case 'system':
+        return '📢';
+      default:
+        return '📌';
+    }
+  };
+
   return (
     <div className={`min-h-screen bg-gradient-to-br from-[#F1F1F2] via-white to-[#A1D6E2]/20 dark:from-slate-950 dark:via-slate-900 dark:to-[#1995AD]/20 ${isRtl ? 'rtl' : 'ltr'}`}>
       {/* Navigation */}
@@ -240,15 +297,87 @@ export default function Home() {
 
               {/* Notifications - للمستخدم المسجل */}
               {user && (
-                <Link 
-                  to={createPageUrl('Notifications')} 
-                  className="relative p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors flex-shrink-0"
-                >
-                  <Bell className="w-5 h-5" />
-                  {unreadNotifs > 0 && (
-                    <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
+                <div className="relative">
+                  <button
+                    onClick={() => setShowNotifications(!showNotifications)}
+                    className="relative p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors flex-shrink-0"
+                  >
+                    <Bell className="w-5 h-5" />
+                    {unreadNotifs > 0 && (
+                      <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                    )}
+                  </button>
+
+                  {/* Notifications Dropdown */}
+                  {showNotifications && (
+                    <div className="absolute top-12 right-0 w-80 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 z-50">
+                      <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
+                        <h3 className="font-semibold text-slate-900 dark:text-white">
+                          {language === 'ar' ? 'الإشعارات' : 'Notifications'}
+                        </h3>
+                        {unreadNotifs > 0 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleMarkAllAsRead}
+                            className="text-xs"
+                          >
+                            {language === 'ar' ? 'تحديد الكل كمقروء' : 'Mark all as read'}
+                          </Button>
+                        )}
+                      </div>
+                      
+                      <ScrollArea className="max-h-96 overflow-y-auto">
+                        {loadingNotifs ? (
+                          <div className="flex justify-center py-8">
+                            <Loader2 className="w-6 h-6 animate-spin text-[#1995AD]" />
+                          </div>
+                        ) : notifications.length === 0 ? (
+                          <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+                            {language === 'ar' ? 'لا توجد إشعارات' : 'No notifications'}
+                          </div>
+                        ) : (
+                          <div className="divide-y divide-slate-200 dark:divide-slate-700">
+                            {notifications.map((notif) => (
+                              <div
+                                key={notif.id}
+                                className={`p-4 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${
+                                  !notif.is_read ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''
+                                }`}
+                                onClick={() => !notif.is_read && handleMarkAsRead(notif.id)}
+                              >
+                                <div className="flex gap-3">
+                                  <div className="text-2xl">
+                                    {getNotificationIcon(notif.type)}
+                                  </div>
+                                  <div className="flex-1">
+                                    <div className="flex items-start justify-between gap-2">
+                                      <h4 className="font-medium text-slate-900 dark:text-white text-sm">
+                                        {getNotificationTitle(notif)}
+                                      </h4>
+                                      {!notif.is_read && (
+                                        <span className="w-2 h-2 bg-blue-600 rounded-full flex-shrink-0 mt-1.5"></span>
+                                      )}
+                                    </div>
+                                    <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                                      {getNotificationText(notif)}
+                                    </p>
+                                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">
+                                      {new Date(notif.created_at).toLocaleDateString(
+                                        language === 'ar' ? 'ar-EG' : 'en-US',
+                                        { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }
+                                      )}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </ScrollArea>
+                    </div>
                   )}
-                </Link>
+                </div>
               )}
 
               {/* Logout Button - للمستخدم المسجل */}
@@ -310,10 +439,7 @@ export default function Home() {
         </div>
       </nav>
 
-      {/* باقي الكود زي ما هو بدون تغيير - Hero Section, Features, Testimonials, Footer */}
-      {/* ... */}
-      
-      {/* Add padding top to account for fixed navbar */}
+      {/* باقي الكود (Hero Section, Features, Testimonials, Footer) كما هو */}
       <div className="pt-20"></div>
 
       {/* Hero Image Section */}
@@ -642,5 +768,3 @@ export default function Home() {
     </div>
   );
 }
-
-
