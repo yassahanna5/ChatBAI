@@ -44,7 +44,7 @@ import {
 import { useLanguage } from '@/components/LanguageContext';
 import { useTheme } from '@/components/ThemeContext';
 import { 
-  getAllProfiles, 
+  getAllUsers, 
   getAllPlans, 
   createPlan, 
   updatePlan, 
@@ -198,7 +198,7 @@ export default function Admin() {
         logsData
       ] = await Promise.all([
         getAdminStats(),
-        getAllProfiles(),
+        getAllUsers(),
         getAllPlans(),
         getAllSubscriptions(),
         getAllPayments(),
@@ -1553,3 +1553,4 @@ export default function Admin() {
     </div>
   );
 }
+
