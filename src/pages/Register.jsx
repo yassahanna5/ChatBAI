@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, ArrowRight, ArrowLeft } from 'lucide-react';
 import { useLanguage } from '@/components/LanguageContext';
-import { saveProfile, getProfileByEmail } from '@/lib/firebase';
+import { saveProfile, getUserByEmail } from '@/lib/firebase';
 
 export default function Register() {
   const navigate = useNavigate();
@@ -122,7 +122,7 @@ export default function Register() {
     
     setLoading(true);
     try {
-      const existingProfile = await getProfileByEmail(personalData.email);
+      const existingProfile = await getUserByEmail(personalData.email);
       if (existingProfile) {
         setError(language === 'ar' ? 'البريد الإلكتروني مسجل مسبقاً' : 'Email already registered');
         setLoading(false);
@@ -500,3 +500,4 @@ export default function Register() {
     </div>
   );
 }
+
