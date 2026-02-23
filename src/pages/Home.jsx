@@ -7,7 +7,7 @@ import { Bot, BarChart3, Target, Zap, ArrowRight, CheckCircle, TrendingUp, FileT
 import { useLanguage } from '@/components/LanguageContext';
 import { useTheme } from '@/components/ThemeContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { fetchApprovedReviews, getUserByEmail } from '@/lib/firebase';
+import { getAllReviews, getUserByEmail } from '@/lib/firebase';
 
 export default function Home() {
   const { t, language, changeLanguage, isRtl } = useLanguage();
@@ -99,7 +99,7 @@ export default function Home() {
     
     try {
       console.log('📍 Fetching reviews from Firebase...');
-      const reviewsData = await fetchApprovedReviews(10);
+      const reviewsData = await getAllReviews();
       
       console.log('📍 Reviews loaded from Firebase:', reviewsData);
       console.log('📍 Number of reviews:', reviewsData.length);
@@ -642,4 +642,5 @@ export default function Home() {
     </div>
   );
 }
+
 
