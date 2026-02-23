@@ -26,8 +26,12 @@ export const saveUser = async (userData) => {
   console.log('👤 Attempting to save user to Firebase...');
   
   try {
+    // ✅ نظف البيانات قبل الحفظ
+    const cleanEmail = userData.email.trim().toLowerCase();
+    const cleanPassword = userData.password.trim();
+    
     // التحقق من أن الايميل غير مسجل مسبقاً
-    const existingUser = await getUserByEmail(userData.email);
+    const existingUser = await getUserByEmail(cleanEmail);
     if (existingUser) {
       throw new Error('Email already exists');
     }
@@ -35,11 +39,11 @@ export const saveUser = async (userData) => {
     const newUserRef = push(usersRef);
     
     // تحديد إذا كان هذا هو حساب الأدمن
-    const isAdmin = userData.email.toLowerCase() === 'admin2030@gmail.com';
+    const isAdmin = cleanEmail === 'admin2030@gmail.com';
     
     const dataToSave = {
-      email: userData.email,
-      password: userData.password,
+      email: cleanEmail,  // ✅ مخزن بحروف صغيرة
+      password: cleanPassword,  // ✅ مخزن بدون مسافات
       full_name: userData.full_name,
       phone: userData.phone || '',
       gender: userData.gender || '',
@@ -73,7 +77,7 @@ export const saveUser = async (userData) => {
     
     // إنشاء إشعار ترحيبي
     await createUserNotification({
-      user_email: userData.email,
+      user_email: cleanEmail,
       type: 'welcome',
       title_en: 'Welcome to ChatBAI!',
       title_ar: 'مرحباً بك في ChatBAI!',
@@ -84,7 +88,7 @@ export const saveUser = async (userData) => {
     return { 
       success: true, 
       id: newUserRef.key,
-      email: userData.email,
+      email: cleanEmail,
       full_name: userData.full_name,
       role: dataToSave.role
     };
@@ -94,10 +98,11 @@ export const saveUser = async (userData) => {
     throw error;
   }
 };
-
 // دالة لجلب مستخدم بالبريد الإلكتروني
 export const getUserByEmail = async (email) => {
   try {
+    const cleanEmail = email.trim().toLowerCase();  // ✅ نظف البيانات
+    
     const snapshot = await get(usersRef);
     if (!snapshot.exists()) return null;
     
@@ -105,7 +110,8 @@ export const getUserByEmail = async (email) => {
     
     snapshot.forEach((childSnapshot) => {
       const user = childSnapshot.val();
-      if (user.email && user.email.toLowerCase() === email.toLowerCase()) {
+      // ✅ قارن بحروف صغيرة
+      if (user.email && user.email.toLowerCase() === cleanEmail) {
         foundUser = {
           id: childSnapshot.key,
           ...user
@@ -285,15 +291,30 @@ export const deleteUser = async (userId) => {
 // دالة لتسجيل الدخول
 export const signInWithEmail = async (email, password) => {
   try {
-    const user = await getUserByEmail(email);
+    // ✅ نظف البيانات قبل البحث
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPassword = password.trim();
+    
+    console.log('🔍 Searching for user with email:', cleanEmail);
+    
+    const user = await getUserByEmail(cleanEmail);
     
     if (!user) {
+      console.log('❌ User not found');
       return { success: false, error: 'Invalid email or password' };
     }
     
-    if (user.password !== password) {
+    console.log('✅ User found, checking password...');
+    console.log('📦 Stored password:', user.password);
+    console.log('📦 Entered password:', cleanPassword);
+    
+    // ✅ قارن الباسورد بعد تنظيفه
+    if (user.password.trim() !== cleanPassword) {
+      console.log('❌ Password mismatch');
       return { success: false, error: 'Invalid email or password' };
     }
+    
+    console.log('✅ Password correct, logging in...');
     
     // تحديث آخر تسجيل دخول
     const userRef = ref(database, `users/${user.id}`);
@@ -316,7 +337,7 @@ export const signInWithEmail = async (email, password) => {
     
   } catch (error) {
     console.error('❌ Sign in error:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: 'An error occurred during sign in' };
   }
 };
 
