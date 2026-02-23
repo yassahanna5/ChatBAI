@@ -669,6 +669,18 @@ export const getUnreadNotificationsCount = async (userEmail) => {
     return 0;
   }
 };
+// أضف هذه الدالة في قسم Notifications Functions
+export const deleteNotification = async (notificationId) => {
+  try {
+    const notifRef = ref(database, `notifications/${notificationId}`);
+    await remove(notifRef);
+    return { success: true };
+  } catch (error) {
+    console.error('Error deleting notification:', error);
+    return { success: false };
+  }
+};
+
 // ==================== Reviews Functions ====================
 export const reviewsRef = ref(database, 'reviews');
 
