@@ -39,7 +39,11 @@ import {
   TrendingUp,
   CheckSquare,
   XSquare,
-  RefreshCw
+  RefreshCw,
+  CalendarDays,
+  Coins,
+  Award,
+  Hash
 } from 'lucide-react';
 import { useLanguage } from '@/components/LanguageContext';
 import { useTheme } from '@/components/ThemeContext';
@@ -490,6 +494,19 @@ export default function Admin() {
     }
   };
 
+  const getStatusBadge = (status) => {
+    switch(status) {
+      case 'active':
+        return <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800">{language === 'ar' ? 'نشط' : 'Active'}</Badge>;
+      case 'expired':
+        return <Badge className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800">{language === 'ar' ? 'منتهي' : 'Expired'}</Badge>;
+      case 'cancelled':
+        return <Badge className="bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400 border-orange-200 dark:border-orange-800">{language === 'ar' ? 'ملغي' : 'Cancelled'}</Badge>;
+      default:
+        return <Badge className="bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700">{status}</Badge>;
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
@@ -753,7 +770,7 @@ export default function Admin() {
                     <BarChart3 className="w-5 h-5" />
                     {language === 'ar' ? 'التحليلات' : 'Analytics'}
                   </CardTitle>
-                  <Badge variant="outline" className="text-xs">
+                  <Badge className="bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700">
                     {language === 'ar' ? 'آخر تحديث: الآن' : 'Live'}
                   </Badge>
                 </CardHeader>
@@ -974,7 +991,7 @@ export default function Admin() {
             </Card>
           )}
 
-          {/* Plans Tab */}
+          {/* Plans Tab - بدون خلفية صفراء ✅ */}
           {activeTab === 'plans' && (
             <Card>
               <CardHeader>
@@ -1006,7 +1023,7 @@ export default function Admin() {
                         <TableCell>{plan.name_en}</TableCell>
                         <TableCell>{formatCurrency(plan.price)}</TableCell>
                         <TableCell>
-                          <Badge variant="outline">
+                          <Badge className="bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700">
                             {plan.billing_cycle === 'monthly' 
                               ? (language === 'ar' ? 'شهري' : 'Monthly')
                               : (language === 'ar' ? 'سنوي' : 'Yearly')}
@@ -1014,7 +1031,10 @@ export default function Admin() {
                         </TableCell>
                         <TableCell>{plan.credits}</TableCell>
                         <TableCell>
-                          <Badge variant={plan.is_active ? 'default' : 'secondary'}>
+                          <Badge className={plan.is_active 
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800'
+                            : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700'
+                          }>
                             {plan.is_active 
                               ? (language === 'ar' ? 'نشط' : 'Active')
                               : (language === 'ar' ? 'غير نشط' : 'Inactive')
@@ -1043,6 +1063,100 @@ export default function Admin() {
                         </TableCell>
                       </TableRow>
                     ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Subscriptions Tab - مع جميع التفاصيل ✅ */}
+          {activeTab === 'subscriptions' && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CreditCard className="w-5 h-5" />
+                  {language === 'ar' ? 'الاشتراكات' : 'Subscriptions'}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{language === 'ar' ? 'المستخدم' : 'User'}</TableHead>
+                      <TableHead>{language === 'ar' ? 'الخطة' : 'Plan'}</TableHead>
+                      <TableHead>{language === 'ar' ? 'الرصيد' : 'Credits'}</TableHead>
+                      <TableHead>{language === 'ar' ? 'المستخدم' : 'Used'}</TableHead>
+                      <TableHead>{language === 'ar' ? 'المتبقي' : 'Left'}</TableHead>
+                      <TableHead>{language === 'ar' ? 'الحالة' : 'Status'}</TableHead>
+                      <TableHead>{language === 'ar' ? 'تاريخ البدء' : 'Start Date'}</TableHead>
+                      <TableHead>{language === 'ar' ? 'تاريخ الانتهاء' : 'End Date'}</TableHead>
+                      <TableHead>{language === 'ar' ? 'المبلغ' : 'Amount'}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {subscriptions.map((sub) => {
+                      const creditsLeft = (sub.credits_total || 0) - (sub.credits_used || 0);
+                      const usagePercentage = sub.credits_total > 0 
+                        ? Math.round((sub.credits_used / sub.credits_total) * 100) 
+                        : 0;
+                      
+                      return (
+                        <TableRow key={sub.id}>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2">
+                              <Mail className="w-4 h-4 text-slate-400" />
+                              {sub.user_email}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Award className="w-4 h-4 text-[#1995AD]" />
+                              {sub.plan_name || sub.plan_id}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1">
+                              <Coins className="w-4 h-4 text-yellow-500" />
+                              {sub.credits_total || 0}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm">{sub.credits_used || 0}</span>
+                              <div className="w-16 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                                <div 
+                                  className="h-full bg-[#1995AD] rounded-full" 
+                                  style={{ width: `${usagePercentage}%` }}
+                                />
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <span className="font-medium">{creditsLeft}</span>
+                          </TableCell>
+                          <TableCell>
+                            {getStatusBadge(sub.status)}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <CalendarDays className="w-4 h-4 text-slate-400" />
+                              {formatDate(sub.start_date)}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {sub.end_date ? (
+                              <div className="flex items-center gap-2">
+                                <CalendarDays className="w-4 h-4 text-slate-400" />
+                                {formatDate(sub.end_date)}
+                              </div>
+                            ) : '-'}
+                          </TableCell>
+                          <TableCell>
+                            {sub.amount_paid ? formatCurrency(sub.amount_paid) : '-'}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </CardContent>
@@ -1097,7 +1211,10 @@ export default function Admin() {
                         <TableCell className="max-w-xs truncate">{review.review_text}</TableCell>
                         <TableCell>{formatDate(review.createdAt)}</TableCell>
                         <TableCell>
-                          <Badge variant={review.is_approved ? 'default' : 'secondary'}>
+                          <Badge className={review.is_approved 
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800'
+                            : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700'
+                          }>
                             {review.is_approved ? 'Approved' : 'Pending'}
                           </Badge>
                         </TableCell>
@@ -1107,7 +1224,7 @@ export default function Admin() {
                               <Button 
                                 variant="ghost" 
                                 size="icon" 
-                                className="h-8 w-8 text-green-600"
+                                className="h-8 w-8 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20"
                                 onClick={() => handleUpdateReviewApproval(review.id, true)}
                                 title={language === 'ar' ? 'موافقة' : 'Approve'}
                               >
@@ -1118,7 +1235,7 @@ export default function Admin() {
                               <Button 
                                 variant="ghost" 
                                 size="icon" 
-                                className="h-8 w-8 text-orange-600"
+                                className="h-8 w-8 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20"
                                 onClick={() => handleUpdateReviewApproval(review.id, false)}
                                 title={language === 'ar' ? 'إلغاء الموافقة' : 'Unapprove'}
                               >
@@ -1128,7 +1245,7 @@ export default function Admin() {
                             <Button 
                               variant="ghost" 
                               size="icon" 
-                              className="h-8 w-8 text-red-600"
+                              className="h-8 w-8 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
                               onClick={() => handleDeleteReview(review.id)}
                               title={language === 'ar' ? 'حذف' : 'Delete'}
                             >
@@ -1185,7 +1302,7 @@ export default function Admin() {
         </div>
       </div>
 
-      {/* Notifications Dialog */}
+      {/* Notifications Dialog - بدون خلفية صفراء ✅ */}
       <Dialog open={showNotificationsDialog} onOpenChange={setShowNotificationsDialog}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
@@ -1193,7 +1310,7 @@ export default function Admin() {
               <Bell className="w-5 h-5" />
               {language === 'ar' ? 'الإشعارات' : 'Notifications'}
               {unreadCount > 0 && (
-                <Badge variant="destructive" className="ml-2">
+                <Badge className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800 ml-2">
                   {unreadCount} {language === 'ar' ? 'جديد' : 'new'}
                 </Badge>
               )}
@@ -1235,7 +1352,7 @@ export default function Admin() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-6 w-6"
+                            className="h-6 w-6 hover:bg-blue-100 dark:hover:bg-blue-900/30"
                             onClick={() => handleMarkAsRead(notif.id)}
                           >
                             <CheckSquare className="w-4 h-4" />
@@ -1244,7 +1361,7 @@ export default function Admin() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-6 w-6 text-red-600"
+                          className="h-6 w-6 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
                           onClick={() => handleDeleteNotification(notif.id)}
                         >
                           <XSquare className="w-4 h-4" />
