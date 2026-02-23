@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, ArrowRight, ArrowLeft } from 'lucide-react';
 import { useLanguage } from '@/components/LanguageContext';
-import { saveProfile, getUserByEmail } from '@/lib/firebase';
+import { saveUser, getUserByEmail } from '@/lib/firebase';
 
 export default function Register() {
   const navigate = useNavigate();
@@ -155,7 +155,7 @@ export default function Register() {
       console.log('📝 Saving profile to Firebase:', profileData);
       
       // حفظ الملف الشخصي في Firebase
-      const result = await saveProfile(profileData);
+      const result = await saveUser(profileData);
       
       console.log('✅ Registration successful:', result);
       
@@ -500,4 +500,5 @@ export default function Register() {
     </div>
   );
 }
+
 
