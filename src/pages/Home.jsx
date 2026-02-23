@@ -7,7 +7,7 @@ import { Bot, BarChart3, Target, Zap, ArrowRight, CheckCircle, TrendingUp, FileT
 import { useLanguage } from '@/components/LanguageContext';
 import { useTheme } from '@/components/ThemeContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { fetchApprovedReviews, getProfileByEmail } from '@/lib/firebase';
+import { fetchApprovedReviews, getUserByEmail } from '@/lib/firebase';
 
 export default function Home() {
   const { t, language, changeLanguage, isRtl } = useLanguage();
@@ -56,7 +56,7 @@ export default function Home() {
         
         // 3. نجيب بيانات المستخدم من Firebase باستخدام الإيميل
         if (base44User && base44User.email) {
-          const firebaseProfile = await getProfileByEmail(base44User.email);
+          const firebaseProfile = await getUserByEmail(base44User.email);
           
           if (firebaseProfile) {
             const userData = {
@@ -642,3 +642,4 @@ export default function Home() {
     </div>
   );
 }
+
