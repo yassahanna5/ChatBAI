@@ -55,7 +55,7 @@ import {
   getAdminStats,
   logActivity,
   getActivityLogs,
-  getNotifications,
+  getUserNotifications,
   markNotificationAsRead,
   deleteNotification,
   updateUserRole,
@@ -215,11 +215,13 @@ export default function Admin() {
       setActivityLogs(logsData);
       
       // Log this activity
-      await logActivity({
-        action: 'admin_view_dashboard',
-        user_email: currentUser?.email || 'unknown',
-        details: 'Admin viewed dashboard'
-      });
+      if (currentUser?.email) {
+        await logActivity({
+          action: 'admin_view_dashboard',
+          user_email: currentUser.email,
+          details: 'Admin viewed dashboard'
+        });
+      }
       
     } catch (error) {
       console.error('Error loading admin data:', error);
@@ -239,9 +241,11 @@ export default function Admin() {
 
   const loadNotifications = async () => {
     try {
-      const notifs = await getNotifications(20);
-      setNotifications(notifs);
-      setUnreadCount(notifs.filter(n => !n.is_read).length);
+      if (currentUser?.email) {
+        const notifs = await getUserNotifications(currentUser.email);
+        setNotifications(notifs);
+        setUnreadCount(notifs.filter(n => !n.is_read).length);
+      }
     } catch (error) {
       console.error('Error loading notifications:', error);
     }
@@ -1216,14 +1220,14 @@ export default function Admin() {
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="font-medium text-slate-900 dark:text-white">
-                            {notif.title?.[language] || notif.title?.en}
+                            {notif.title_en && (language === 'ar' ? notif.title_ar || notif.title_en : notif.title_en)}
                           </span>
                           <span className="text-xs text-slate-500">
                             {formatDate(notif.created_at)}
                           </span>
                         </div>
                         <p className="text-sm text-slate-600 dark:text-slate-400">
-                          {notif.message?.[language] || notif.message?.en}
+                          {notif.message_en && (language === 'ar' ? notif.message_ar || notif.message_en : notif.message_en)}
                         </p>
                       </div>
                       <div className="flex items-center gap-1">
@@ -1553,4 +1557,3 @@ export default function Admin() {
     </div>
   );
 }
-
