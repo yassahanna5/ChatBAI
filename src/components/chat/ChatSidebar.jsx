@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
-import { MessageSquarePlus, History, Settings, User, Bell, CreditCard, LogOut, Moon, Sun, Languages, Shield, X, Edit2, Save, Camera } from 'lucide-react';
+import { MessageSquarePlus, History, Settings, User, Bell, CreditCard, LogOut, Moon, Sun, Languages, Shield, X, Edit2, Save, Camera, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -25,10 +25,12 @@ export default function ChatSidebar({
   const isAdmin = user?.role === 'admin';
   const { t, language, changeLanguage, isRtl } = useLanguage();
   const { darkMode, toggleDarkMode } = useTheme();
+  const fileInputRef = useRef(null);
   
   // State for profile editing
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [profileForm, setProfileForm] = useState({
     full_name: user?.full_name || '',
     phone: user?.phone || '',
@@ -36,7 +38,16 @@ export default function ChatSidebar({
     avatar_url: user?.avatar_url || '',
     business_name: user?.business_name || '',
     country: user?.country || '',
-    city: user?.city || ''
+    city: user?.city || '',
+    gender: user?.gender || '',
+    industry: user?.industry || '',
+    company_size: user?.company_size || '',
+    website: user?.website || '',
+    monthly_budget: user?.monthly_budget || '',
+    target_audience: user?.target_audience || '',
+    current_challenges: user?.current_challenges || '',
+    goals: user?.goals || '',
+    competitors: user?.competitors || ''
   });
 
   const handleProfileUpdate = async () => {
@@ -44,6 +55,32 @@ export default function ChatSidebar({
     if (success) {
       setEditingProfile(false);
       setShowProfileModal(false);
+    }
+  };
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingImage(true);
+    try {
+      // تحويل الصورة إلى Base64
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64String = reader.result;
+        
+        // تحديث الصورة في النموذج
+        setProfileForm({ ...profileForm, avatar_url: base64String });
+        
+        // حفظ الصورة مباشرة (اختياري - لو عايز تحفظ فوراً)
+        // await onUpdateProfile({ avatar_url: base64String });
+        
+        setUploadingImage(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      setUploadingImage(false);
     }
   };
 
@@ -55,6 +92,15 @@ export default function ChatSidebar({
       .join('')
       .toUpperCase()
       .slice(0, 2);
+  };
+
+  // تنسيق التاريخ للعرض
+  const formatDate = (dateString) => {
+    if (!dateString) return '';
+    return new Date(dateString).toLocaleDateString(
+      language === 'ar' ? 'ar-EG' : 'en-US',
+      { year: 'numeric', month: 'long', day: 'numeric' }
+    );
   };
 
   return (
@@ -219,9 +265,9 @@ export default function ChatSidebar({
 
       {/* Profile Edit Modal */}
       <Dialog open={showProfileModal} onOpenChange={setShowProfileModal}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="text-xl">
               {editingProfile 
                 ? (language === 'ar' ? 'تعديل الملف الشخصي' : 'Edit Profile')
                 : (language === 'ar' ? 'الملف الشخصي' : 'Profile')
@@ -230,137 +276,354 @@ export default function ChatSidebar({
           </DialogHeader>
           
           {!editingProfile ? (
-            // عرض الملف الشخصي
-            <div className="space-y-4 py-4">
+            // عرض الملف الشخصي (كل البيانات)
+            <div className="space-y-6 py-4">
+              {/* صورة البروفايل */}
               <div className="flex justify-center">
                 {user?.avatar_url ? (
                   <img 
                     src={user.avatar_url} 
                     alt={user.full_name} 
-                    className="w-24 h-24 rounded-full object-cover border-4 border-[#1995AD]/20"
+                    className="w-32 h-32 rounded-full object-cover border-4 border-[#1995AD]/20"
                   />
                 ) : (
-                  <div className="w-24 h-24 rounded-full bg-gradient-to-br from-[#1995AD] to-[#A1D6E2] flex items-center justify-center text-white text-3xl font-bold">
+                  <div className="w-32 h-32 rounded-full bg-gradient-to-br from-[#1995AD] to-[#A1D6E2] flex items-center justify-center text-white text-4xl font-bold">
                     {getInitials(user?.full_name)}
                   </div>
                 )}
               </div>
-              
-              <div className="space-y-2">
-                <Label>{language === 'ar' ? 'الاسم' : 'Name'}</Label>
-                <p className="text-slate-900 dark:text-white p-2 bg-slate-100 dark:bg-slate-800 rounded">
-                  {user?.full_name}
-                </p>
+
+              {/* بيانات المستخدم الأساسية */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label className="text-xs text-slate-500">{language === 'ar' ? 'الاسم الكامل' : 'Full Name'}</Label>
+                  <p className="text-slate-900 dark:text-white p-2 bg-slate-100 dark:bg-slate-800 rounded">
+                    {user?.full_name || '-'}
+                  </p>
+                </div>
+                
+                <div className="space-y-1">
+                  <Label className="text-xs text-slate-500">Email</Label>
+                  <p className="text-slate-900 dark:text-white p-2 bg-slate-100 dark:bg-slate-800 rounded">
+                    {user?.email || '-'}
+                  </p>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs text-slate-500">{language === 'ar' ? 'رقم الهاتف' : 'Phone'}</Label>
+                  <p className="text-slate-900 dark:text-white p-2 bg-slate-100 dark:bg-slate-800 rounded">
+                    {user?.phone || '-'}
+                  </p>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs text-slate-500">{language === 'ar' ? 'تاريخ الميلاد' : 'Birth Date'}</Label>
+                  <p className="text-slate-900 dark:text-white p-2 bg-slate-100 dark:bg-slate-800 rounded">
+                    {user?.birth_date ? formatDate(user.birth_date) : '-'}
+                  </p>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs text-slate-500">{language === 'ar' ? 'النوع' : 'Gender'}</Label>
+                  <p className="text-slate-900 dark:text-white p-2 bg-slate-100 dark:bg-slate-800 rounded">
+                    {user?.gender === 'male' ? (language === 'ar' ? 'ذكر' : 'Male') : 
+                     user?.gender === 'female' ? (language === 'ar' ? 'أنثى' : 'Female') : '-'}
+                  </p>
+                </div>
               </div>
-              
-              <div className="space-y-2">
-                <Label>Email</Label>
-                <p className="text-slate-900 dark:text-white p-2 bg-slate-100 dark:bg-slate-800 rounded">
-                  {user?.email}
-                </p>
-              </div>
-              
-              {user?.phone && (
-                <div className="space-y-2">
-                  <Label>{language === 'ar' ? 'الهاتف' : 'Phone'}</Label>
-                  <p className="text-slate-900 dark:text-white p-2 bg-slate-100 dark:bg-slate-800 rounded">
-                    {user.phone}
-                  </p>
-                </div>
+
+              {/* بيانات العمل */}
+              {(user?.business_name || user?.industry || user?.company_size) && (
+                <>
+                  <h3 className="font-semibold text-slate-900 dark:text-white pt-2 border-t">
+                    {language === 'ar' ? 'معلومات العمل' : 'Business Information'}
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {user?.business_name && (
+                      <div className="space-y-1">
+                        <Label className="text-xs text-slate-500">{language === 'ar' ? 'اسم الشركة' : 'Company Name'}</Label>
+                        <p className="text-slate-900 dark:text-white p-2 bg-slate-100 dark:bg-slate-800 rounded">
+                          {user.business_name}
+                        </p>
+                      </div>
+                    )}
+                    
+                    {user?.industry && (
+                      <div className="space-y-1">
+                        <Label className="text-xs text-slate-500">{language === 'ar' ? 'المجال' : 'Industry'}</Label>
+                        <p className="text-slate-900 dark:text-white p-2 bg-slate-100 dark:bg-slate-800 rounded">
+                          {user.industry}
+                        </p>
+                      </div>
+                    )}
+
+                    {user?.company_size && (
+                      <div className="space-y-1">
+                        <Label className="text-xs text-slate-500">{language === 'ar' ? 'حجم الشركة' : 'Company Size'}</Label>
+                        <p className="text-slate-900 dark:text-white p-2 bg-slate-100 dark:bg-slate-800 rounded">
+                          {user.company_size}
+                        </p>
+                      </div>
+                    )}
+
+                    {user?.website && (
+                      <div className="space-y-1">
+                        <Label className="text-xs text-slate-500">{language === 'ar' ? 'الموقع الإلكتروني' : 'Website'}</Label>
+                        <p className="text-slate-900 dark:text-white p-2 bg-slate-100 dark:bg-slate-800 rounded">
+                          <a href={user.website} target="_blank" rel="noopener noreferrer" className="text-[#1995AD] hover:underline">
+                            {user.website}
+                          </a>
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
-              
-              {user?.birth_date && (
-                <div className="space-y-2">
-                  <Label>{language === 'ar' ? 'تاريخ الميلاد' : 'Birth Date'}</Label>
-                  <p className="text-slate-900 dark:text-white p-2 bg-slate-100 dark:bg-slate-800 rounded">
-                    {new Date(user.birth_date).toLocaleDateString()}
-                  </p>
-                </div>
+
+              {/* الموقع */}
+              {(user?.country || user?.city) && (
+                <>
+                  <h3 className="font-semibold text-slate-900 dark:text-white pt-2 border-t">
+                    {language === 'ar' ? 'الموقع' : 'Location'}
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {user?.country && (
+                      <div className="space-y-1">
+                        <Label className="text-xs text-slate-500">{language === 'ar' ? 'الدولة' : 'Country'}</Label>
+                        <p className="text-slate-900 dark:text-white p-2 bg-slate-100 dark:bg-slate-800 rounded">
+                          {user.country}
+                        </p>
+                      </div>
+                    )}
+                    
+                    {user?.city && (
+                      <div className="space-y-1">
+                        <Label className="text-xs text-slate-500">{language === 'ar' ? 'المدينة' : 'City'}</Label>
+                        <p className="text-slate-900 dark:text-white p-2 bg-slate-100 dark:bg-slate-800 rounded">
+                          {user.city}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
-              
-              {user?.business_name && (
-                <div className="space-y-2">
-                  <Label>{language === 'ar' ? 'الشركة' : 'Company'}</Label>
-                  <p className="text-slate-900 dark:text-white p-2 bg-slate-100 dark:bg-slate-800 rounded">
-                    {user.business_name}
-                  </p>
-                </div>
+
+              {/* أهداف وتحديات */}
+              {(user?.goals || user?.current_challenges || user?.target_audience) && (
+                <>
+                  <h3 className="font-semibold text-slate-900 dark:text-white pt-2 border-t">
+                    {language === 'ar' ? 'الأهداف والتحديات' : 'Goals & Challenges'}
+                  </h3>
+                  <div className="space-y-4">
+                    {user?.goals && (
+                      <div className="space-y-1">
+                        <Label className="text-xs text-slate-500">{language === 'ar' ? 'الأهداف' : 'Goals'}</Label>
+                        <p className="text-slate-900 dark:text-white p-2 bg-slate-100 dark:bg-slate-800 rounded">
+                          {user.goals}
+                        </p>
+                      </div>
+                    )}
+                    
+                    {user?.current_challenges && (
+                      <div className="space-y-1">
+                        <Label className="text-xs text-slate-500">{language === 'ar' ? 'التحديات الحالية' : 'Current Challenges'}</Label>
+                        <p className="text-slate-900 dark:text-white p-2 bg-slate-100 dark:bg-slate-800 rounded">
+                          {user.current_challenges}
+                        </p>
+                      </div>
+                    )}
+
+                    {user?.target_audience && (
+                      <div className="space-y-1">
+                        <Label className="text-xs text-slate-500">{language === 'ar' ? 'الجمهور المستهدف' : 'Target Audience'}</Label>
+                        <p className="text-slate-900 dark:text-white p-2 bg-slate-100 dark:bg-slate-800 rounded">
+                          {user.target_audience}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
             </div>
           ) : (
             // نموذج تعديل الملف الشخصي
-            <div className="space-y-4 py-4">
+            <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto px-1">
+              {/* صورة البروفايل مع إمكانية التعديل */}
               <div className="flex justify-center">
                 <div className="relative">
                   {profileForm.avatar_url ? (
                     <img 
                       src={profileForm.avatar_url} 
                       alt="Avatar" 
-                      className="w-24 h-24 rounded-full object-cover border-4 border-[#1995AD]/20"
+                      className="w-32 h-32 rounded-full object-cover border-4 border-[#1995AD]/20"
                     />
                   ) : (
-                    <div className="w-24 h-24 rounded-full bg-gradient-to-br from-[#1995AD] to-[#A1D6E2] flex items-center justify-center text-white text-3xl font-bold">
+                    <div className="w-32 h-32 rounded-full bg-gradient-to-br from-[#1995AD] to-[#A1D6E2] flex items-center justify-center text-white text-4xl font-bold">
                       {getInitials(profileForm.full_name)}
                     </div>
                   )}
-                  <button className="absolute bottom-0 right-0 w-8 h-8 bg-[#1995AD] rounded-full flex items-center justify-center">
-                    <Camera className="w-4 h-4 text-white" />
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleImageUpload}
+                    accept="image/*"
+                    className="hidden"
+                  />
+                  <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadingImage}
+                    className="absolute bottom-0 right-0 w-10 h-10 bg-[#1995AD] rounded-full flex items-center justify-center hover:bg-[#148095] transition-colors disabled:opacity-50"
+                  >
+                    {uploadingImage ? (
+                      <Loader2 className="w-5 h-5 text-white animate-spin" />
+                    ) : (
+                      <Camera className="w-5 h-5 text-white" />
+                    )}
                   </button>
                 </div>
               </div>
-              
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>{language === 'ar' ? 'الاسم الكامل' : 'Full Name'}</Label>
+                  <Input
+                    value={profileForm.full_name}
+                    onChange={(e) => setProfileForm({ ...profileForm, full_name: e.target.value })}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>{language === 'ar' ? 'رقم الهاتف' : 'Phone'}</Label>
+                  <Input
+                    value={profileForm.phone}
+                    onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>{language === 'ar' ? 'تاريخ الميلاد' : 'Birth Date'}</Label>
+                  <Input
+                    type="date"
+                    value={profileForm.birth_date}
+                    onChange={(e) => setProfileForm({ ...profileForm, birth_date: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>{language === 'ar' ? 'النوع' : 'Gender'}</Label>
+                  <select
+                    value={profileForm.gender}
+                    onChange={(e) => setProfileForm({ ...profileForm, gender: e.target.value })}
+                    className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+                  >
+                    <option value="">{language === 'ar' ? 'اختر' : 'Select'}</option>
+                    <option value="male">{language === 'ar' ? 'ذكر' : 'Male'}</option>
+                    <option value="female">{language === 'ar' ? 'أنثى' : 'Female'}</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>{language === 'ar' ? 'اسم الشركة' : 'Company Name'}</Label>
+                  <Input
+                    value={profileForm.business_name}
+                    onChange={(e) => setProfileForm({ ...profileForm, business_name: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>{language === 'ar' ? 'المجال' : 'Industry'}</Label>
+                  <Input
+                    value={profileForm.industry}
+                    onChange={(e) => setProfileForm({ ...profileForm, industry: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>{language === 'ar' ? 'حجم الشركة' : 'Company Size'}</Label>
+                  <select
+                    value={profileForm.company_size}
+                    onChange={(e) => setProfileForm({ ...profileForm, company_size: e.target.value })}
+                    className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+                  >
+                    <option value="">{language === 'ar' ? 'اختر' : 'Select'}</option>
+                    <option value="1-10">1-10</option>
+                    <option value="11-50">11-50</option>
+                    <option value="51-200">51-200</option>
+                    <option value="201-500">201-500</option>
+                    <option value="500+">500+</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>{language === 'ar' ? 'الموقع الإلكتروني' : 'Website'}</Label>
+                  <Input
+                    value={profileForm.website}
+                    onChange={(e) => setProfileForm({ ...profileForm, website: e.target.value })}
+                    placeholder="https://example.com"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>{language === 'ar' ? 'الدولة' : 'Country'}</Label>
+                  <Input
+                    value={profileForm.country}
+                    onChange={(e) => setProfileForm({ ...profileForm, country: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>{language === 'ar' ? 'المدينة' : 'City'}</Label>
+                  <Input
+                    value={profileForm.city}
+                    onChange={(e) => setProfileForm({ ...profileForm, city: e.target.value })}
+                  />
+                </div>
+              </div>
+
               <div className="space-y-2">
-                <Label>{language === 'ar' ? 'الاسم الكامل' : 'Full Name'}</Label>
+                <Label>{language === 'ar' ? 'الجمهور المستهدف' : 'Target Audience'}</Label>
                 <Input
-                  value={profileForm.full_name}
-                  onChange={(e) => setProfileForm({ ...profileForm, full_name: e.target.value })}
+                  value={profileForm.target_audience}
+                  onChange={(e) => setProfileForm({ ...profileForm, target_audience: e.target.value })}
                 />
               </div>
-              
+
               <div className="space-y-2">
-                <Label>{language === 'ar' ? 'رقم الهاتف' : 'Phone'}</Label>
+                <Label>{language === 'ar' ? 'التحديات الحالية' : 'Current Challenges'}</Label>
                 <Input
-                  value={profileForm.phone}
-                  onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
+                  value={profileForm.current_challenges}
+                  onChange={(e) => setProfileForm({ ...profileForm, current_challenges: e.target.value })}
                 />
               </div>
-              
+
               <div className="space-y-2">
-                <Label>{language === 'ar' ? 'تاريخ الميلاد' : 'Birth Date'}</Label>
+                <Label>{language === 'ar' ? 'الأهداف' : 'Goals'}</Label>
                 <Input
-                  type="date"
-                  value={profileForm.birth_date}
-                  onChange={(e) => setProfileForm({ ...profileForm, birth_date: e.target.value })}
+                  value={profileForm.goals}
+                  onChange={(e) => setProfileForm({ ...profileForm, goals: e.target.value })}
                 />
               </div>
-              
+
               <div className="space-y-2">
-                <Label>{language === 'ar' ? 'الشركة' : 'Company'}</Label>
+                <Label>{language === 'ar' ? 'المنافسون' : 'Competitors'}</Label>
                 <Input
-                  value={profileForm.business_name}
-                  onChange={(e) => setProfileForm({ ...profileForm, business_name: e.target.value })}
+                  value={profileForm.competitors}
+                  onChange={(e) => setProfileForm({ ...profileForm, competitors: e.target.value })}
                 />
               </div>
-              
+
               <div className="space-y-2">
-                <Label>{language === 'ar' ? 'الدولة' : 'Country'}</Label>
+                <Label>{language === 'ar' ? 'الميزانية الشهرية' : 'Monthly Budget'}</Label>
                 <Input
-                  value={profileForm.country}
-                  onChange={(e) => setProfileForm({ ...profileForm, country: e.target.value })}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label>{language === 'ar' ? 'المدينة' : 'City'}</Label>
-                <Input
-                  value={profileForm.city}
-                  onChange={(e) => setProfileForm({ ...profileForm, city: e.target.value })}
+                  value={profileForm.monthly_budget}
+                  onChange={(e) => setProfileForm({ ...profileForm, monthly_budget: e.target.value })}
+                  placeholder="e.g. 5000 USD"
                 />
               </div>
             </div>
           )}
           
-          <DialogFooter>
+          <DialogFooter className="gap-2">
             {!editingProfile ? (
               <>
                 <Button variant="outline" onClick={() => setShowProfileModal(false)}>
@@ -376,7 +639,16 @@ export default function ChatSidebar({
                       avatar_url: user?.avatar_url || '',
                       business_name: user?.business_name || '',
                       country: user?.country || '',
-                      city: user?.city || ''
+                      city: user?.city || '',
+                      gender: user?.gender || '',
+                      industry: user?.industry || '',
+                      company_size: user?.company_size || '',
+                      website: user?.website || '',
+                      monthly_budget: user?.monthly_budget || '',
+                      target_audience: user?.target_audience || '',
+                      current_challenges: user?.current_challenges || '',
+                      goals: user?.goals || '',
+                      competitors: user?.competitors || ''
                     });
                   }}
                   className="bg-[#1995AD] hover:bg-[#1995AD]/90"
