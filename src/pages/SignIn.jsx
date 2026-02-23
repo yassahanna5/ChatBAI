@@ -22,7 +22,11 @@ export default function SignIn() {
   const handleSignIn = async (e) => {
     e.preventDefault();
     
-    if (!formData.email || !formData.password) {
+    // ✅ تنظيف البيانات قبل الإرسال
+    const email = formData.email.trim().toLowerCase();
+    const password = formData.password.trim();
+    
+    if (!email || !password) {
       setError(language === 'ar' ? 'البريد الإلكتروني وكلمة المرور مطلوبان' : 'Email and password are required');
       return;
     }
@@ -31,27 +35,27 @@ export default function SignIn() {
     setError('');
 
     try {
-      console.log('🔑 Attempting sign in with:', formData.email);
+      console.log('🔑 Attempting sign in with:', email);
       
-      const result = await signInWithEmail(formData.email, formData.password);
+      const result = await signInWithEmail(email, password);
       
       if (result.success) {
-        console.log('✅ Sign in successful:', result.profile);
+        console.log('✅ Sign in successful:', result.user);  // 👈 result.user مش result.profile
         
         // تخزين بيانات المستخدم في sessionStorage
         sessionStorage.setItem('currentUser', JSON.stringify({
-          email: result.profile.email,
-          full_name: result.profile.full_name,
-          id: result.profile.id,
-          role: result.profile.role || 'user'
+          email: result.user.email,
+          full_name: result.user.full_name,
+          id: result.user.id,
+          role: result.user.role || 'user'
         }));
         
         alert(language === 'ar' 
-          ? `مرحباً ${result.profile.full_name}! تم تسجيل الدخول بنجاح.` 
-          : `Welcome ${result.profile.full_name}! You have successfully signed in.`);
+          ? `مرحباً ${result.user.full_name}! تم تسجيل الدخول بنجاح.` 
+          : `Welcome ${result.user.full_name}! You have successfully signed in.`);
         
         // توجيه الأدمن للوحة التحكم والمستخدم العادي للدردشة
-        if (result.profile.role === 'admin') {
+        if (result.user.role === 'admin') {
           navigate(createPageUrl('Admin'));
         } else {
           navigate(createPageUrl('Chat'));
