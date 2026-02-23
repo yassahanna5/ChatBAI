@@ -42,8 +42,8 @@ export const saveUser = async (userData) => {
     const isAdmin = cleanEmail === 'admin2030@gmail.com';
     
     const dataToSave = {
-      email: cleanEmail,  // ✅ مخزن بحروف صغيرة
-      password: cleanPassword,  // ✅ مخزن بدون مسافات
+      email: cleanEmail,
+      password: cleanPassword,
       full_name: userData.full_name,
       phone: userData.phone || '',
       gender: userData.gender || '',
@@ -76,14 +76,7 @@ export const saveUser = async (userData) => {
     console.log('✅ User saved successfully! ID:', newUserRef.key);
     
     // إنشاء إشعار ترحيبي
-    await createUserNotification({
-      user_email: cleanEmail,
-      type: 'welcome',
-      title_en: 'Welcome to ChatBAI!',
-      title_ar: 'مرحباً بك في ChatBAI!',
-      message_en: `Welcome ${userData.full_name}! We're excited to have you on board.`,
-      message_ar: `مرحباً ${userData.full_name}! نحن متحمسون لانضمامك إلينا.`
-    });
+    await createWelcomeNotification(cleanEmail, userData.full_name);
     
     return { 
       success: true, 
@@ -98,10 +91,11 @@ export const saveUser = async (userData) => {
     throw error;
   }
 };
+
 // دالة لجلب مستخدم بالبريد الإلكتروني
 export const getUserByEmail = async (email) => {
   try {
-    const cleanEmail = email.trim().toLowerCase();  // ✅ نظف البيانات
+    const cleanEmail = email.trim().toLowerCase();
     
     const snapshot = await get(usersRef);
     if (!snapshot.exists()) return null;
@@ -110,7 +104,6 @@ export const getUserByEmail = async (email) => {
     
     snapshot.forEach((childSnapshot) => {
       const user = childSnapshot.val();
-      // ✅ قارن بحروف صغيرة
       if (user.email && user.email.toLowerCase() === cleanEmail) {
         foundUser = {
           id: childSnapshot.key,
@@ -166,10 +159,6 @@ export const updateUser = async (userId, userData) => {
   }
 };
 
-
-
-// أضف هذه الدوال في قسم Users Functions (بعد دوال users الموجودة)
-
 // دالة لتحديث دور المستخدم
 export const updateUserRole = async (userId, newRole) => {
   try {
@@ -179,18 +168,15 @@ export const updateUserRole = async (userId, newRole) => {
       updated_at: new Date().toISOString()
     });
     
-    // تسجيل النشاط
     await logActivity({
       action: 'update_user_role',
       user_email: 'admin',
       details: `Updated user ${userId} role to ${newRole}`
     });
     
-    // الحصول على بيانات المستخدم
     const userSnapshot = await get(userRef);
     const user = userSnapshot.val();
     
-    // إنشاء إشعار للمستخدم
     if (user && user.email) {
       await createUserNotification({
         user_email: user.email,
@@ -212,7 +198,6 @@ export const updateUserRole = async (userId, newRole) => {
 // دالة لإضافة مستخدم جديد (بواسطة الأدمن)
 export const addUserByAdmin = async (userData) => {
   try {
-    // التحقق من عدم وجود الإيميل مسبقاً
     const existingUser = await getUserByEmail(userData.email);
     if (existingUser) {
       throw new Error('Email already exists');
@@ -238,22 +223,13 @@ export const addUserByAdmin = async (userData) => {
     
     await set(newUserRef, dataToSave);
     
-    // تسجيل النشاط
     await logActivity({
       action: 'create_user',
       user_email: 'admin',
       details: `Created user: ${userData.email}`
     });
     
-    // إنشاء إشعار
-    await createUserNotification({
-      user_email: userData.email,
-      type: 'welcome',
-      title_en: 'Welcome to ChatBAI!',
-      title_ar: 'مرحباً بك في ChatBAI!',
-      message_en: `Welcome ${userData.full_name}! Your account has been created by admin.`,
-      message_ar: `مرحباً ${userData.full_name}! تم إنشاء حسابك بواسطة الإدارة.`
-    });
+    await createWelcomeNotification(userData.email, userData.full_name);
     
     return { success: true, id: newUserRef.key };
     
@@ -263,18 +239,15 @@ export const addUserByAdmin = async (userData) => {
   }
 };
 
-// دالة لحذف مستخدم (موجودة بالفعل، تأكد من وجودها)
+// دالة لحذف مستخدم
 export const deleteUser = async (userId) => {
   try {
     const userRef = ref(database, `users/${userId}`);
-    
-    // الحصول على بيانات المستخدم قبل الحذف للتسجيل
     const userSnapshot = await get(userRef);
     const user = userSnapshot.val();
     
     await remove(userRef);
     
-    // تسجيل النشاط
     await logActivity({
       action: 'delete_user',
       user_email: 'admin',
@@ -291,7 +264,6 @@ export const deleteUser = async (userId) => {
 // دالة لتسجيل الدخول
 export const signInWithEmail = async (email, password) => {
   try {
-    // ✅ نظف البيانات قبل البحث
     const cleanEmail = email.trim().toLowerCase();
     const cleanPassword = password.trim();
     
@@ -305,10 +277,7 @@ export const signInWithEmail = async (email, password) => {
     }
     
     console.log('✅ User found, checking password...');
-    console.log('📦 Stored password:', user.password);
-    console.log('📦 Entered password:', cleanPassword);
     
-    // ✅ قارن الباسورد بعد تنظيفه
     if (user.password.trim() !== cleanPassword) {
       console.log('❌ Password mismatch');
       return { success: false, error: 'Invalid email or password' };
@@ -316,18 +285,15 @@ export const signInWithEmail = async (email, password) => {
     
     console.log('✅ Password correct, logging in...');
     
-    // تحديث آخر تسجيل دخول
     const userRef = ref(database, `users/${user.id}`);
     await update(userRef, {
       lastLogin: new Date().toISOString()
     });
     
-    // التحقق من منح الرصيد المجاني
     if (!user.free_credits_given) {
       await grantFreeCredits(user.email, user.id);
     }
     
-    // إزالة كلمة المرور من البيانات المرتجعة
     const { password: _, ...safeUser } = user;
     
     return { 
@@ -344,7 +310,6 @@ export const signInWithEmail = async (email, password) => {
 // دالة لمنح الرصيد المجاني للمستخدم الجديد
 export const grantFreeCredits = async (userEmail, userId) => {
   try {
-    // إنشاء اشتراك مجاني
     const subscriptionData = {
       user_email: userEmail,
       plan_id: 'free_trial',
@@ -353,28 +318,22 @@ export const grantFreeCredits = async (userEmail, userId) => {
       credits_used: 0,
       tokens_per_question: 500,
       start_date: new Date().toISOString(),
-      end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 يوم
+      end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
       status: 'active',
       amount_paid: 0
     };
     
     await createSubscription(subscriptionData);
     
-    // تحديث حالة منح الرصيد
     const userRef = ref(database, `users/${userId}`);
     await update(userRef, {
       free_credits_given: true
     });
     
-    // إنشاء إشعار بالرصيد
-    await createUserNotification({
-      user_email: userEmail,
-      type: 'credits',
-      title_en: '🎉 You received 10 free credits!',
-      title_ar: '🎉 لقد حصلت على 10 أرصدة مجانية!',
-      message_en: 'You can now ask 5 free questions. Enjoy!',
-      message_ar: 'يمكنك الآن طرح 5 أسئلة مجانية. استمتع!'
-    });
+    const userSnapshot = await get(userRef);
+    const user = userSnapshot.val();
+    
+    await createCreditsNotification(userEmail, user?.full_name || 'User');
     
     return { success: true };
   } catch (error) {
@@ -403,8 +362,6 @@ export const completeOnboarding = async (userEmail) => {
 
 // دالة لرفع صورة البروفايل (تحتاج تخزين في Firebase Storage)
 export const uploadAvatar = async (userId, file) => {
-  // هذه الدالة تحتاج Firebase Storage
-  // سنضيفها لاحقاً
   console.log('Upload avatar:', userId, file);
   return { success: true, url: 'temp_url' };
 };
@@ -422,6 +379,7 @@ export const updateAvatar = async (userId, avatarUrl) => {
     return { success: false };
   }
 };
+
 // ==================== Subscriptions Functions ====================
 export const subscriptionsRef = ref(database, 'subscriptions');
 
@@ -444,7 +402,6 @@ export const createSubscription = async (subscriptionData) => {
     
     await set(newSubRef, dataToSave);
     
-    // إشعار بالاشتراك الجديد
     await createUserNotification({
       user_email: subscriptionData.user_email,
       type: 'subscription',
@@ -532,6 +489,7 @@ export const deleteSubscription = async (subId) => {
     return { success: false };
   }
 };
+
 // ==================== Payments Functions ====================
 export const paymentsRef = ref(database, 'payments');
 
@@ -584,7 +542,7 @@ export const createPayment = async (paymentData) => {
     throw error;
   }
 };
-// أضفها داخل Payments Functions
+
 export const updatePayment = async (paymentId, paymentData) => {
   try {
     const paymentRef = ref(database, `payments/${paymentId}`);
@@ -715,6 +673,7 @@ export const deleteConversation = async (conversationId) => {
     return { success: false };
   }
 };
+
 // ==================== Notifications Functions ====================
 export const notificationsRef = ref(database, 'notifications');
 
@@ -800,7 +759,7 @@ export const getUnreadNotificationsCount = async (userEmail) => {
     return 0;
   }
 };
-// أضف هذه الدالة في قسم Notifications Functions
+
 export const deleteNotification = async (notificationId) => {
   try {
     const notifRef = ref(database, `notifications/${notificationId}`);
@@ -808,6 +767,56 @@ export const deleteNotification = async (notificationId) => {
     return { success: true };
   } catch (error) {
     console.error('Error deleting notification:', error);
+    return { success: false };
+  }
+};
+
+// ==================== New Notification Functions ====================
+
+// دالة لإنشاء إشعار ترحيبي
+export const createWelcomeNotification = async (userEmail, userName) => {
+  try {
+    const newNotifRef = push(notificationsRef);
+    const dataToSave = {
+      user_email: userEmail,
+      title_en: '👋 Welcome to ChatBAI!',
+      title_ar: '👋 مرحباً بك في ChatBAI!',
+      message_en: `Welcome ${userName}! We're excited to have you on board.`,
+      message_ar: `مرحباً ${userName}! نحن متحمسون لانضمامك إلينا.`,
+      type: 'welcome',
+      is_read: false,
+      created_at: new Date().toISOString()
+    };
+    
+    await set(newNotifRef, dataToSave);
+    console.log('✅ Welcome notification created for:', userEmail);
+    return { success: true, id: newNotifRef.key };
+  } catch (error) {
+    console.error('Error creating welcome notification:', error);
+    return { success: false };
+  }
+};
+
+// دالة لإنشاء إشعار الرصيد
+export const createCreditsNotification = async (userEmail, userName) => {
+  try {
+    const newNotifRef = push(notificationsRef);
+    const dataToSave = {
+      user_email: userEmail,
+      title_en: '🎉 You received 10 free credits!',
+      title_ar: '🎉 لقد حصلت على 10 أرصدة مجانية!',
+      message_en: `Hi ${userName}! You can now ask 5 free questions. Enjoy!`,
+      message_ar: `مرحباً ${userName}! يمكنك الآن طرح 5 أسئلة مجانية. استمتع!`,
+      type: 'credits',
+      is_read: false,
+      created_at: new Date().toISOString()
+    };
+    
+    await set(newNotifRef, dataToSave);
+    console.log('✅ Credits notification created for:', userEmail);
+    return { success: true, id: newNotifRef.key };
+  } catch (error) {
+    console.error('Error creating credits notification:', error);
     return { success: false };
   }
 };
@@ -831,7 +840,6 @@ export const saveReview = async (reviewData) => {
     
     await set(newReviewRef, dataToSave);
     
-    // إشعار للأدمن بتقييم جديد
     await createUserNotification({
       user_email: 'admin',
       type: 'system',
@@ -899,11 +907,9 @@ export const updateReviewApproval = async (reviewId, isApproved) => {
       updated_at: new Date().toISOString()
     });
     
-    // الحصول على بيانات التقييم
     const reviewSnapshot = await get(reviewRef);
     const review = reviewSnapshot.val();
     
-    // إشعار للمستخدم
     if (review && review.user_email) {
       await createUserNotification({
         user_email: review.user_email,
@@ -932,6 +938,7 @@ export const deleteReview = async (reviewId) => {
     return { success: false };
   }
 };
+
 // ==================== Plans Functions ====================
 export const plansRef = ref(database, 'plans');
 
@@ -1033,6 +1040,7 @@ export const deletePlan = async (planId) => {
     throw error;
   }
 };
+
 // ==================== Authentication Helper ====================
 
 export const getCurrentUser = () => {
@@ -1058,6 +1066,7 @@ export const logout = () => {
   sessionStorage.removeItem('currentUser');
   window.location.href = '/';
 };
+
 // ==================== Analytics Functions ====================
 
 export const logPageVisit = async (pagePath) => {
@@ -1181,7 +1190,6 @@ export const getAnalyticsStats = async () => {
     const seconds = avgDuration % 60;
     const avgDurationFormatted = `${minutes}m ${seconds}s`;
     
-    // إحصائيات الدول
     const countries = {};
     visits.forEach(v => {
       if (v.country) countries[v.country] = (countries[v.country] || 0) + 1;
@@ -1195,7 +1203,6 @@ export const getAnalyticsStats = async () => {
         percentage: Math.round((count / totalVisits) * 100)
       }));
     
-    // إحصائيات الأجهزة
     const devices = {};
     visits.forEach(v => {
       if (v.device) devices[v.device] = (devices[v.device] || 0) + 1;
@@ -1206,7 +1213,6 @@ export const getAnalyticsStats = async () => {
       deviceStats[device] = Math.round((count / totalVisits) * 100);
     });
     
-    // إحصائيات أنظمة التشغيل
     const osStats = {};
     visits.forEach(v => {
       if (v.os) osStats[v.os] = (osStats[v.os] || 0) + 1;
@@ -1217,7 +1223,6 @@ export const getAnalyticsStats = async () => {
       osPercentages[os] = Math.round((count / totalVisits) * 100);
     });
     
-    // إحصائيات الصفحات
     const pages = {};
     visits.forEach(v => {
       if (v.page) pages[v.page] = (pages[v.page] || 0) + 1;
@@ -1262,6 +1267,7 @@ export const getAnalyticsStats = async () => {
     };
   }
 };
+
 // ==================== Activity Logs Functions ====================
 export const activityLogsRef = ref(database, 'activity_logs');
 
@@ -1299,6 +1305,7 @@ export const getActivityLogs = async (limit = 50) => {
     return [];
   }
 };
+
 // ==================== Admin Dashboard Functions ====================
 
 export const getAdminStats = async () => {
