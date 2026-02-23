@@ -172,6 +172,126 @@ export const deleteUser = async (userId) => {
   }
 };
 
+// أضف هذه الدوال في قسم Users Functions (بعد دوال users الموجودة)
+
+// دالة لتحديث دور المستخدم
+export const updateUserRole = async (userId, newRole) => {
+  try {
+    const userRef = ref(database, `users/${userId}`);
+    await update(userRef, { 
+      role: newRole,
+      updated_at: new Date().toISOString()
+    });
+    
+    // تسجيل النشاط
+    await logActivity({
+      action: 'update_user_role',
+      user_email: 'admin',
+      details: `Updated user ${userId} role to ${newRole}`
+    });
+    
+    // الحصول على بيانات المستخدم
+    const userSnapshot = await get(userRef);
+    const user = userSnapshot.val();
+    
+    // إنشاء إشعار للمستخدم
+    if (user && user.email) {
+      await createUserNotification({
+        user_email: user.email,
+        type: 'system',
+        title_en: 'Your account role has been updated',
+        title_ar: 'تم تحديث دور حسابك',
+        message_en: `Your role is now: ${newRole}`,
+        message_ar: `دورك الآن: ${newRole === 'admin' ? 'مدير' : 'مستخدم'}`
+      });
+    }
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error updating user role:', error);
+    return { success: false, error };
+  }
+};
+
+// دالة لإضافة مستخدم جديد (بواسطة الأدمن)
+export const addUserByAdmin = async (userData) => {
+  try {
+    // التحقق من عدم وجود الإيميل مسبقاً
+    const existingUser = await getUserByEmail(userData.email);
+    if (existingUser) {
+      throw new Error('Email already exists');
+    }
+    
+    const newUserRef = push(usersRef);
+    const dataToSave = {
+      email: userData.email,
+      password: userData.password,
+      full_name: userData.full_name,
+      phone: userData.phone || '',
+      gender: userData.gender || '',
+      role: userData.role || 'user',
+      business_name: userData.business_name || '',
+      country: userData.country || '',
+      city: userData.city || '',
+      createdAt: new Date().toISOString(),
+      lastLogin: null,
+      free_credits_given: false,
+      onboarding_completed: false,
+      created_by: 'admin'
+    };
+    
+    await set(newUserRef, dataToSave);
+    
+    // تسجيل النشاط
+    await logActivity({
+      action: 'create_user',
+      user_email: 'admin',
+      details: `Created user: ${userData.email}`
+    });
+    
+    // إنشاء إشعار
+    await createUserNotification({
+      user_email: userData.email,
+      type: 'welcome',
+      title_en: 'Welcome to ChatBAI!',
+      title_ar: 'مرحباً بك في ChatBAI!',
+      message_en: `Welcome ${userData.full_name}! Your account has been created by admin.`,
+      message_ar: `مرحباً ${userData.full_name}! تم إنشاء حسابك بواسطة الإدارة.`
+    });
+    
+    return { success: true, id: newUserRef.key };
+    
+  } catch (error) {
+    console.error('Error adding user by admin:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// دالة لحذف مستخدم (موجودة بالفعل، تأكد من وجودها)
+export const deleteUser = async (userId) => {
+  try {
+    const userRef = ref(database, `users/${userId}`);
+    
+    // الحصول على بيانات المستخدم قبل الحذف للتسجيل
+    const userSnapshot = await get(userRef);
+    const user = userSnapshot.val();
+    
+    await remove(userRef);
+    
+    // تسجيل النشاط
+    await logActivity({
+      action: 'delete_user',
+      user_email: 'admin',
+      details: `Deleted user: ${user?.email || userId}`
+    });
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    return { success: false };
+  }
+};
+
 // دالة لتسجيل الدخول
 export const signInWithEmail = async (email, password) => {
   try {
