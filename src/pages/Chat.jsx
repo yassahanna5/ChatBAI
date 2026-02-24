@@ -29,12 +29,13 @@ const MODEL_ICONS = {
   QWEN: 'https://openrouter.ai/images/icons/Qwen.png' 
 };
 
-// ==================== مفاتيح API ====================
+// ==================== مفاتيح API من متغيرات البيئة ====================
 const OPENROUTER_API_KEYS = {
-  DEEPSEEK: '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',
-  STEPFUN: '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',
-  MISTRAL: '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',
-  QWEN: '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'
+  DEEPSEEK: import.meta.env.VITE_OPENROUTER_API_KEY_DEEPSEEK || '',
+  STEPFUN: import.meta.env.VITE_OPENROUTER_API_KEY_STEPFUN || '',
+  MISTRAL: import.meta.env.VITE_OPENROUTER_API_KEY_MISTRAL || '',
+  QWEN: import.meta.env.VITE_OPENROUTER_API_KEY_QWEN || '',
+  FLUX: import.meta.env.VITE_OPENROUTER_API_KEY_FLUX || ''
 };
 
 // ==================== أسماء الموديلات ====================
@@ -42,8 +43,20 @@ const OPENROUTER_MODELS = {
   DEEPSEEK: 'deepseek/deepseek-chat',
   STEPFUN: 'stepfun/step-3.5-flash',
   MISTRAL: 'mistralai/mistral-7b-instruct',
-  QWEN: 'qwen/qwen3.5-plus-02-15'
+  QWEN: 'qwen/qwen3.5-plus-02-15',
+  FLUX: 'black-forest-labs/flux.2-klein-4b'  // نموذج الصور المجاني
 };
+
+// التحقق من وجود المفاتيح في بيئة التطوير
+if (import.meta.env.DEV) {
+  console.log('🔑 OpenRouter API Keys Status:', {
+    DEEPSEEK: OPENROUTER_API_KEYS.DEEPSEEK ? '✅' : '❌',
+    STEPFUN: OPENROUTER_API_KEYS.STEPFUN ? '✅' : '❌',
+    MISTRAL: OPENROUTER_API_KEYS.MISTRAL ? '✅' : '❌',
+    QWEN: OPENROUTER_API_KEYS.QWEN ? '✅' : '❌',
+    FLUX: OPENROUTER_API_KEYS.FLUX ? '✅' : '❌'
+  });
+}
 
 // ==================== دالة تحويل الملف إلى Base64 ====================
 const fileToBase64 = (file) => {
@@ -195,6 +208,14 @@ export default function Chat() {
   const invokeOpenRouter = async (model, prompt, files = []) => {
     const apiKey = OPENROUTER_API_KEYS[model];
     const modelName = OPENROUTER_MODELS[model];
+    
+    // التحقق من وجود المفتاح
+    if (!apiKey) {
+      console.error(`❌ No API key found for model: ${model}`);
+      return language === 'ar' 
+        ? `❌ مفتاح API غير موجود للنموذج ${model}. الرجاء إضافة المفتاح في ملف .env`
+        : `❌ API key not found for model ${model}. Please add the key in .env file`;
+    }
     
     const userContent = [];
     
@@ -436,7 +457,7 @@ Respond in ${language === 'ar' ? 'Arabic' : 'English'}.`;
           title: activeConversation.title.startsWith('New') ? content.slice(0, 50) : activeConversation.title
         };
         
-        // إضافة كل رسالة على حدة (في التطبيق الفعلي، تحتاج دالة updateConversation)
+        // إضافة كل رسالة على حدة
         for (const msg of [userMessage, assistantMessage]) {
           await addMessageToConversation(activeConversation.id, msg);
         }
@@ -496,7 +517,8 @@ Respond in ${language === 'ar' ? 'Arabic' : 'English'}.`;
     { id: 'DEEPSEEK', name: 'DeepSeek', icon: MODEL_ICONS.DEEPSEEK, description: 'Advanced - Files OK', isImage: true },
     { id: 'STEPFUN', name: 'StepFun', icon: MODEL_ICONS.STEPFUN, description: 'Fast - Files OK', isImage: true },
     { id: 'MISTRAL', name: 'Mistral', icon: MODEL_ICONS.MISTRAL, description: 'Efficient - Files OK', isImage: true },
-    { id: 'QWEN', name: 'Qwen 3.5', icon: MODEL_ICONS.QWEN, description: 'Latest - Files OK', isImage: true }
+    { id: 'QWEN', name: 'Qwen 3.5', icon: MODEL_ICONS.QWEN, description: 'Latest - Files OK', isImage: true },
+    { id: 'FLUX', name: 'FLUX.2 Klein', icon: '🎨', description: 'Image Generation - Free', isImage: false }
   ];
 
   const currentModel = models.find(m => m.id === selectedModel);
@@ -791,4 +813,3 @@ Respond in ${language === 'ar' ? 'Arabic' : 'English'}.`;
     </div>
   );
 }
-
