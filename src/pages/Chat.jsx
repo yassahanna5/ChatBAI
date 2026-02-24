@@ -266,7 +266,7 @@ export default function Chat() {
           model: modelName,
           messages: messages,
           temperature: 0.7,
-          max_tokens: 4000
+          max_tokens: 2000
         })
       });
 
@@ -813,3 +813,4 @@ Respond in ${language === 'ar' ? 'Arabic' : 'English'}.`;
     </div>
   );
 }
+
