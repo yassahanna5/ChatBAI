@@ -57,21 +57,43 @@ export default function Plans() {
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  // دالة للتحقق من أن الاشتراك لا يزال نشطاً
-  const checkSubscriptionActive = (subscription) => {
-    if (!subscription) return false;
-    
+  // دالة شاملة للتحقق من إمكانية الاشتراك في باقة جديدة
+  const canSubscribeToNewPlan = (subscription) => {
+    // إذا مفيش اشتراك أساساً => يقدر يشترك ✅
+    if (!subscription) {
+      return { allowed: true, reason: 'no_subscription' };
+    }
+
     // التحقق من حالة الاشتراك
-    if (subscription.status !== 'active') return false;
-    
+    if (subscription.status !== 'active') {
+      // إذا كان الاشتراك غير نشط (منتهي، ملغي، pending) => يقدر يشترك ✅
+      return { allowed: true, reason: 'not_active' };
+    }
+
     // التحقق من تاريخ الانتهاء
     if (subscription.end_date) {
       const endDate = new Date(subscription.end_date);
       const now = new Date();
-      if (endDate < now) return false;
+      if (endDate < now) {
+        // إذا كان الاشتراك منتهي الصلاحية => يقدر يشترك ✅
+        return { allowed: true, reason: 'expired' };
+      }
     }
-    
-    return true;
+
+    // التحقق من الرصيد المتبقي
+    const availableCredits = (subscription.credits_total || 0) - (subscription.credits_used || 0);
+    if (availableCredits <= 0) {
+      // إذا خلص الرصيد => يقدر يشترك ✅
+      return { allowed: true, reason: 'no_credits' };
+    }
+
+    // إذا كان الاشتراك active، لسه فيه مدة، وفيه رصيد => ميقدرش يشترك ❌
+    return { 
+      allowed: false, 
+      reason: 'active_with_credits',
+      availableCredits,
+      endDate: subscription.end_date
+    };
   };
 
   // تحميل البيانات عند بدء الصفحة
@@ -111,7 +133,7 @@ export default function Plans() {
         
         console.log('📦 الاشتراك المستلم:', subscription);
         
-        if (subscription && checkSubscriptionActive(subscription)) {
+        if (subscription) {
           setCurrentSubscription(subscription);
         }
         
@@ -171,12 +193,26 @@ export default function Plans() {
       return;
     }
 
-    // التحقق من وجود اشتراك نشط
-    if (currentSubscription && checkSubscriptionActive(currentSubscription)) {
-      alert(language === 'ar' 
-        ? 'لديك اشتراك نشط بالفعل. لا يمكنك الاشتراك في باقة جديدة حتى ينتهي اشتراكك الحالي.' 
-        : 'You already have an active subscription. You cannot subscribe to a new plan until your current subscription expires.'
-      );
+    // التحقق من إمكانية الاشتراك في باقة جديدة
+    const subscriptionCheck = canSubscribeToNewPlan(currentSubscription);
+    
+    if (!subscriptionCheck.allowed) {
+      // عرض رسالة مناسبة حسب سبب المنع
+      let message = '';
+      if (language === 'ar') {
+        message = `❌ لا يمكنك الاشتراك في باقة جديدة الآن.\n\n`;
+        message += `لديك اشتراك نشط في باقة ${currentSubscription?.plan_name}:\n`;
+        message += `- الرصيد المتبقي: ${subscriptionCheck.availableCredits} نقطة\n`;
+        message += `- تاريخ الانتهاء: ${new Date(subscriptionCheck.endDate).toLocaleDateString()}\n\n`;
+        message += `يمكنك الاشتراك في باقة جديدة بعد استهلاك الرصيد أو انتهاء الاشتراك.`;
+      } else {
+        message = `❌ You cannot subscribe to a new plan at this time.\n\n`;
+        message += `You have an active subscription to ${currentSubscription?.plan_name}:\n`;
+        message += `- Remaining credits: ${subscriptionCheck.availableCredits}\n`;
+        message += `- Expiry date: ${new Date(subscriptionCheck.endDate).toLocaleDateString()}\n\n`;
+        message += `You can subscribe to a new plan after using all credits or when the subscription expires.`;
+      }
+      alert(message);
       return;
     }
 
@@ -344,6 +380,9 @@ export default function Plans() {
                     {language === 'ar' ? 'تنتهي في:' : 'Expires:'} {new Date(currentSubscription.end_date).toLocaleDateString()}
                   </p>
                 )}
+                <p className="text-xs text-slate-500">
+                  {language === 'ar' ? 'الرصيد المتبقي:' : 'Remaining credits:'} {(currentSubscription.credits_total || 0) - (currentSubscription.credits_used || 0)}
+                </p>
               </div>
             )}
           </div>
@@ -373,9 +412,18 @@ export default function Plans() {
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             {plans.map((plan, index) => {
-              const isCurrentPlan = currentSubscription?.plan_id === plan.id && checkSubscriptionActive(currentSubscription);
+              const isCurrentPlan = currentSubscription?.plan_id === plan.id;
               const isYearly = plan.billing_cycle === 'yearly';
-              const isDisabled = isCurrentPlan || subscribing;
+              
+              // التحقق مما إذا كان هذا هو الاشتراك الحالي للمستخدم
+              let isDisabled = subscribing;
+              
+              if (isCurrentPlan && currentSubscription) {
+                // إذا كانت هذه هي الخطة الحالية، نتحقق إذا كان يقدر يشترك فيها تاني
+                const subscriptionCheck = canSubscribeToNewPlan(currentSubscription);
+                // يقدر يشترك لو الاشتراك مش active أو الرصيد خلص أو انتهى
+                isDisabled = !subscriptionCheck.allowed;
+              }
               
               return (
                 <motion.div
@@ -462,11 +510,13 @@ export default function Plans() {
                         onClick={() => handleSubscribeClick(plan)}
                         disabled={isDisabled}
                         className={`w-full ${
-                          isCurrentPlan 
-                            ? 'bg-green-500 hover:bg-green-600 text-white cursor-default' 
-                            : isYearly
-                              ? 'bg-[#1995AD] hover:bg-[#1995AD]/90 text-white'
-                              : 'border-[#1995AD] text-[#1995AD] hover:bg-[#1995AD] hover:text-white'
+                          isCurrentPlan && isDisabled
+                            ? 'bg-slate-400 cursor-not-allowed text-white' 
+                            : isCurrentPlan
+                              ? 'bg-green-500 hover:bg-green-600 text-white cursor-default'
+                              : isYearly
+                                ? 'bg-[#1995AD] hover:bg-[#1995AD]/90 text-white'
+                                : 'border-[#1995AD] text-[#1995AD] hover:bg-[#1995AD] hover:text-white'
                         }`}
                         variant={isYearly && !isCurrentPlan ? 'default' : 'outline'}
                       >
