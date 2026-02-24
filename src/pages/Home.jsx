@@ -234,7 +234,7 @@ export default function Home() {
     ));
   };
 
-  // الحصول على نص الإشعار حسب اللغة
+  // الحصول على نص الإشعار حسب اللغة (للعرض المباشر - اختياري)
   const getNotificationText = (notif) => {
     if (language === 'ar') {
       return notif.message_ar || notif.message_en;
@@ -249,7 +249,7 @@ export default function Home() {
     return notif.title_en;
   };
 
-  // أيقونة حسب نوع الإشعار
+  // أيقونة حسب نوع الإشعار (للعرض المباشر - اختياري)
   const getNotificationIcon = (type) => {
     switch(type) {
       case 'welcome':
@@ -264,18 +264,6 @@ export default function Home() {
         return '📌';
     }
   };
-
-  // إغلاق القائمة المنسدلة عند الضغط خارجها
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (showNotifications && !event.target.closest('.notifications-container')) {
-        setShowNotifications(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showNotifications]);
 
   return (
     <div className={`min-h-screen bg-gradient-to-br from-[#F1F1F2] via-white to-[#A1D6E2]/20 dark:from-slate-950 dark:via-slate-900 dark:to-[#1995AD]/20 ${isRtl ? 'rtl' : 'ltr'}`}>
@@ -307,90 +295,17 @@ export default function Home() {
                 {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
               </button>
 
-              {/* Notifications - للمستخدم المسجل - من Firebase ✅ */}
+              {/* Notifications - للمستخدم المسجل - ✅ يودي لصفحة Notifications */}
               {user && (
-                <div className="relative notifications-container">
-                  <button
-                    onClick={() => setShowNotifications(!showNotifications)}
-                    className="relative p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors flex-shrink-0"
-                  >
-                    <Bell className="w-5 h-5" />
-                    {unreadNotifs > 0 && (
-                      <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                    )}
-                  </button>
-
-                  {/* Notifications Dropdown - من Firebase */}
-                  {showNotifications && (
-                    <div className="absolute top-12 right-0 w-80 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 z-50">
-                      <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
-                        <h3 className="font-semibold text-slate-900 dark:text-white">
-                          {language === 'ar' ? 'الإشعارات' : 'Notifications'}
-                        </h3>
-                        {unreadNotifs > 0 && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={handleMarkAllAsRead}
-                            className="text-xs"
-                          >
-                            {language === 'ar' ? 'تحديد الكل كمقروء' : 'Mark all as read'}
-                          </Button>
-                        )}
-                      </div>
-                      
-                      {/* ✅ استخدم div بدلاً من ScrollArea */}
-                      <div className="max-h-96 overflow-y-auto">
-                        {loadingNotifs ? (
-                          <div className="flex justify-center py-8">
-                            <Loader2 className="w-6 h-6 animate-spin text-[#1995AD]" />
-                          </div>
-                        ) : notifications.length === 0 ? (
-                          <div className="text-center py-8 text-slate-500 dark:text-slate-400">
-                            {language === 'ar' ? 'لا توجد إشعارات' : 'No notifications'}
-                          </div>
-                        ) : (
-                          <div className="divide-y divide-slate-200 dark:divide-slate-700">
-                            {notifications.map((notif) => (
-                              <div
-                                key={notif.id}
-                                className={`p-4 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors cursor-pointer ${
-                                  !notif.is_read ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''
-                                }`}
-                                onClick={() => !notif.is_read && handleMarkAsRead(notif.id)}
-                              >
-                                <div className="flex gap-3">
-                                  <div className="text-2xl">
-                                    {getNotificationIcon(notif.type)}
-                                  </div>
-                                  <div className="flex-1">
-                                    <div className="flex items-start justify-between gap-2">
-                                      <h4 className="font-medium text-slate-900 dark:text-white text-sm">
-                                        {getNotificationTitle(notif)}
-                                      </h4>
-                                      {!notif.is_read && (
-                                        <span className="w-2 h-2 bg-blue-600 rounded-full flex-shrink-0 mt-1.5"></span>
-                                      )}
-                                    </div>
-                                    <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-                                      {getNotificationText(notif)}
-                                    </p>
-                                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">
-                                      {new Date(notif.created_at).toLocaleDateString(
-                                        language === 'ar' ? 'ar-EG' : 'en-US',
-                                        { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }
-                                      )}
-                                    </p>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                <Link 
+                  to={createPageUrl('Notifications')} 
+                  className="relative p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors flex-shrink-0"
+                >
+                  <Bell className="w-5 h-5" />
+                  {unreadNotifs > 0 && (
+                    <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
                   )}
-                </div>
+                </Link>
               )}
 
               {/* Logout Button - للمستخدم المسجل */}
