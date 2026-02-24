@@ -413,7 +413,7 @@ export const createSubscription = async (subscriptionData) => {
     
     return { success: true, id: newSubRef.key };
   } catch (error) {
-    console.error('Error creating subscription:', error);
+    console.error('❌ Error creating subscription:', error);
     throw error;
   }
 };
@@ -423,19 +423,19 @@ export const getUserSubscription = async (userEmail) => {
     const snapshot = await get(subscriptionsRef);
     if (!snapshot.exists()) return null;
     
-    let activeSubscription = null;
+    let userSubscription = null;
     
     snapshot.forEach((childSnapshot) => {
       const sub = childSnapshot.val();
-      if (sub.user_email === userEmail && sub.status === 'active') {
-        activeSubscription = {
+      if (sub.user_email === userEmail) {
+        userSubscription = {  // ✅ بنرجع أي اشتراك للمستخدم (مهما كانت حالته)
           id: childSnapshot.key,
           ...sub
         };
       }
     });
     
-    return activeSubscription;
+    return userSubscription;
   } catch (error) {
     console.error('Error getting user subscription:', error);
     return null;
