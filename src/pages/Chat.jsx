@@ -24,38 +24,42 @@ import {
 
 // ==================== الأيقونات ====================
 const MODEL_ICONS = {
-  DEEPSEEK: 'https://openrouter.ai/images/icons/DeepSeek.png',
-  STEPFUN: 'https://upload.wikimedia.org/wikipedia/commons/6/6c/StepFun.png',
+  GEMMA: 'https://openrouter.ai/images/icons/Google.png',
+  QWEN: 'https://openrouter.ai/images/icons/Qwen.png',
+  OPENAI: 'https://openrouter.ai/images/icons/OpenAI.png',
   MISTRAL: 'https://openrouter.ai/images/icons/Mistral.png',
-  QWEN: 'https://openrouter.ai/images/icons/Qwen.png' 
+  STEPFUN: 'https://upload.wikimedia.org/wikipedia/commons/6/6c/StepFun.png'
 };
 
 // ==================== مفاتيح API من متغيرات البيئة ====================
 const OPENROUTER_API_KEYS = {
-  DEEPSEEK: import.meta.env.VITE_OPENROUTER_API_KEY_DEEPSEEK || '',
-  STEPFUN: import.meta.env.VITE_OPENROUTER_API_KEY_STEPFUN || '',
-  MISTRAL: import.meta.env.VITE_OPENROUTER_API_KEY_MISTRAL || '',
+  GEMMA: import.meta.env.VITE_OPENROUTER_API_KEY_GEMMA || '',
+  GEMMA2: import.meta.env.VITE_OPENROUTER_API_KEY_GEMMA2 || '',
   QWEN: import.meta.env.VITE_OPENROUTER_API_KEY_QWEN || '',
-  FLUX: import.meta.env.VITE_OPENROUTER_API_KEY_FLUX || ''
+  OPENAI: import.meta.env.VITE_OPENROUTER_API_KEY_OPENAI || '',
+  MISTRAL: import.meta.env.VITE_OPENROUTER_API_KEY_MISTRAL || '',
+  STEPFUN: import.meta.env.VITE_OPENROUTER_API_KEY_STEPFUN || ''
 };
 
 // ==================== أسماء الموديلات ====================
 const OPENROUTER_MODELS = {
-  DEEPSEEK: 'deepseek/deepseek-chat',
-  STEPFUN: 'stepfun/step-3.5-flash',
-  MISTRAL: 'mistralai/mistral-7b-instruct',
-  QWEN: 'qwen/qwen3.5-plus-02-15',
-  FLUX: 'black-forest-labs/flux.2-klein-4b'  // نموذج الصور
+  GEMMA: 'google/gemma-3-27b-it',
+  GEMMA2: 'google/gemma-3-27b-it',
+  QWEN: 'qwen/qwen3-coder-480b',
+  OPENAI: 'openai/gpt-oss-120b',
+  MISTRAL: 'mistralai/mistral-small-3.1-24b-instruct',
+  STEPFUN: 'stepfun/step-3.5-flash'
 };
 
 // التحقق من وجود المفاتيح في بيئة التطوير
 if (import.meta.env.DEV) {
   console.log('🔑 OpenRouter API Keys Status:', {
-    DEEPSEEK: OPENROUTER_API_KEYS.DEEPSEEK ? '✅' : '❌',
-    STEPFUN: OPENROUTER_API_KEYS.STEPFUN ? '✅' : '❌',
-    MISTRAL: OPENROUTER_API_KEYS.MISTRAL ? '✅' : '❌',
+    GEMMA: OPENROUTER_API_KEYS.GEMMA ? '✅' : '❌',
+    GEMMA2: OPENROUTER_API_KEYS.GEMMA2 ? '✅' : '❌',
     QWEN: OPENROUTER_API_KEYS.QWEN ? '✅' : '❌',
-    FLUX: OPENROUTER_API_KEYS.FLUX ? '✅' : '❌'
+    OPENAI: OPENROUTER_API_KEYS.OPENAI ? '✅' : '❌',
+    MISTRAL: OPENROUTER_API_KEYS.MISTRAL ? '✅' : '❌',
+    STEPFUN: OPENROUTER_API_KEYS.STEPFUN ? '✅' : '❌'
   });
 }
 
@@ -116,7 +120,7 @@ export default function Chat() {
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [selectedModel, setSelectedModel] = useState('base44');
+  const [selectedModel, setSelectedModel] = useState('GEMMA');
   const [showPlusMenu, setShowPlusMenu] = useState(false);
   const [showModelSelector, setShowModelSelector] = useState(false);
   const fileInputRef = useRef(null);
@@ -205,7 +209,7 @@ export default function Chat() {
     }
   };
 
-  // ==================== دالة OpenRouter المتطورة (تدعم الصور) ====================
+  // ==================== دالة OpenRouter المتطورة ====================
   const invokeOpenRouter = async (model, prompt, files = []) => {
     const apiKey = OPENROUTER_API_KEYS[model];
     const modelName = OPENROUTER_MODELS[model];
@@ -282,10 +286,8 @@ export default function Chat() {
       const data = await response.json();
       console.log('✅ Response received');
       
-      // التحقق مما إذا كان الرد يحتوي على صور (بعض النماذج مثل FLUX)
       const assistantMessage = data.choices[0].message;
       
-      // إذا كان الرد متعدد الوسائط (نصوص + صور)
       if (Array.isArray(assistantMessage.content)) {
         return {
           type: 'multimodal',
@@ -293,7 +295,6 @@ export default function Chat() {
         };
       }
       
-      // رد نصي عادي
       return {
         type: 'text',
         content: assistantMessage.content
@@ -423,38 +424,72 @@ export default function Chat() {
     setUploadedFiles([]);
 
     try {
-      const fullPrompt = `Previous conversation:
+      // ✅ تحضير بيانات البروفايل بشكل كامل
+      const profileContext = user ? `
+User Profile Information:
+- Full Name: ${user.full_name || 'Not provided'}
+- Email: ${user.email || 'Not provided'}
+- Phone: ${user.phone || 'Not provided'}
+- Gender: ${user.gender || 'Not provided'}
+- Birth Date: ${user.birth_date || 'Not provided'}
+
+Business Information:
+- Company Name: ${user.business_name || 'Not provided'}
+- Business Type: ${user.business_type || 'Not provided'}
+- Industry: ${user.industry || 'Not provided'}
+- Company Size: ${user.company_size || 'Not provided'}
+- Website: ${user.website || 'Not provided'}
+- Monthly Budget: ${user.monthly_budget || 'Not provided'}
+
+Location:
+- Country: ${user.country || 'Not provided'}
+- City: ${user.city || 'Not provided'}
+
+Goals & Challenges:
+- Target Audience: ${user.target_audience || 'Not provided'}
+- Current Challenges: ${user.current_challenges || 'Not provided'}
+- Goals: ${user.goals || 'Not provided'}
+- Competitors: ${user.competitors || 'Not provided'}
+
+Social Media: ${user.social_platforms || 'Not provided'}
+` : 'No profile information available.';
+
+      // ✅ بناء البرومبت الكامل مع بيانات البروفايل
+      const fullPrompt = `You are an AI business consultant. You have access to the user's profile information below.
+
+${profileContext}
+
+Previous conversation:
 ${messages.map(m => `${m.role}: ${m.content}`).join('\n')}
 
 User's new question: ${content}
 
 ${currentFiles.length > 0 ? `\n📎 Attached ${currentFiles.length} file(s) for analysis.` : ''}
 
-Respond in ${language === 'ar' ? 'Arabic' : 'English'}.`;
+Instructions:
+1. Use the user's profile information to provide personalized responses
+2. Consider their industry, goals, and challenges when answering
+3. Tailor your advice to their specific business context
+4. If they mention their company, reference their profile data
+5. Provide actionable insights based on their situation
+6. Be professional and helpful
 
-      let response;
+Respond in ${language === 'ar' ? 'Arabic' : 'English'} with detailed, professional analysis.`;
 
-      if (selectedModel === 'base44') {
-        // استخدام OpenRouter كنموذج افتراضي
-        response = await invokeOpenRouter('DEEPSEEK', fullPrompt, currentFiles);
-      } else {
-        response = await invokeOpenRouter(selectedModel, fullPrompt, currentFiles);
-      }
+      let response = await invokeOpenRouter(selectedModel, fullPrompt, currentFiles);
 
       // تحضير رسالة المساعد حسب نوع الرد (نص أو صور)
       let assistantMessage;
       
       if (response.type === 'multimodal') {
-        // إذا كان الرد متعدد الوسائط (صور + نص)
         assistantMessage = {
           role: 'assistant',
-          content: response.content, // هذا array من العناصر (صور ونصوص)
+          content: response.content,
           timestamp: new Date().toISOString(),
           model: selectedModel,
           isMultimodal: true
         };
       } else {
-        // رد نصي عادي
         assistantMessage = {
           role: 'assistant',
           content: response.content,
@@ -472,7 +507,6 @@ Respond in ${language === 'ar' ? 'Arabic' : 'English'}.`;
         if (creditsResult.success) {
           console.log('✅ 2 credits deducted successfully');
           
-          // تحديث بيانات الاشتراك محلياً
           if (subscription) {
             setSubscription({
               ...subscription,
@@ -504,14 +538,12 @@ Respond in ${language === 'ar' ? 'Arabic' : 'English'}.`;
           setConversations([newConversation, ...conversations]);
         }
       } else {
-        // تحديث المحادثة الموجودة
         const updatedConv = {
           ...activeConversation,
           messages: finalMessages,
           title: activeConversation.title.startsWith('New') ? content.slice(0, 50) : activeConversation.title
         };
         
-        // إضافة كل رسالة على حدة
         for (const msg of [userMessage, assistantMessage]) {
           await addMessageToConversation(activeConversation.id, msg);
         }
@@ -564,12 +596,12 @@ Respond in ${language === 'ar' ? 'Arabic' : 'English'}.`;
   const canSendMessage = subscription && subscription.credits_used < subscription.credits_total;
 
   const models = [
-    { id: 'base44', name: 'Base44 AI', icon: '🧠', description: 'Default model - Files OK' },
-    { id: 'DEEPSEEK', name: 'DeepSeek', icon: MODEL_ICONS.DEEPSEEK, description: 'Advanced - Files OK', isImage: true },
-    { id: 'STEPFUN', name: 'StepFun', icon: MODEL_ICONS.STEPFUN, description: 'Fast - Files OK', isImage: true },
-    { id: 'MISTRAL', name: 'Mistral', icon: MODEL_ICONS.MISTRAL, description: 'Efficient - Files OK', isImage: true },
-    { id: 'QWEN', name: 'Qwen 3.5', icon: MODEL_ICONS.QWEN, description: 'Latest - Files OK', isImage: true },
-    { id: 'FLUX', name: 'FLUX.2 Klein', icon: '🎨', description: 'Image Generation - Paid', isImage: false }
+    { id: 'GEMMA', name: 'Gemma 3 27B', icon: MODEL_ICONS.GEMMA, description: 'Google - Advanced AI', isImage: true },
+    { id: 'GEMMA2', name: 'Gemma 3 27B', icon: MODEL_ICONS.GEMMA, description: 'Google - Second instance', isImage: true },
+    { id: 'QWEN', name: 'Qwen3 Coder', icon: MODEL_ICONS.QWEN, description: '480B Coder - Powerful', isImage: true },
+    { id: 'OPENAI', name: 'GPT-OSS 120B', icon: MODEL_ICONS.OPENAI, description: 'Open Source GPT', isImage: true },
+    { id: 'MISTRAL', name: 'Mistral Small 3.1', icon: MODEL_ICONS.MISTRAL, description: '24B - Efficient', isImage: true },
+    { id: 'STEPFUN', name: 'Step 3.5 Flash', icon: MODEL_ICONS.STEPFUN, description: 'Fast & Responsive', isImage: true }
   ];
 
   const currentModel = models.find(m => m.id === selectedModel);
