@@ -18,7 +18,8 @@ import {
   addMessageToConversation,
   getAllPlans,
   updateUser,
-  getUserByEmail
+  getUserByEmail,
+  updateSubscriptionCredits
 } from '@/lib/firebase';
 
 // ==================== الأيقونات ====================
@@ -44,7 +45,7 @@ const OPENROUTER_MODELS = {
   STEPFUN: 'stepfun/step-3.5-flash',
   MISTRAL: 'mistralai/mistral-7b-instruct',
   QWEN: 'qwen/qwen3.5-plus-02-15',
-  FLUX: 'black-forest-labs/flux.2-klein-4b'  // نموذج الصور المجاني
+  FLUX: 'black-forest-labs/flux.2-klein-4b'  // نموذج الصور
 };
 
 // التحقق من وجود المفاتيح في بيئة التطوير
@@ -204,7 +205,7 @@ export default function Chat() {
     }
   };
 
-  // ==================== دالة OpenRouter ====================
+  // ==================== دالة OpenRouter المتطورة (تدعم الصور) ====================
   const invokeOpenRouter = async (model, prompt, files = []) => {
     const apiKey = OPENROUTER_API_KEYS[model];
     const modelName = OPENROUTER_MODELS[model];
@@ -212,9 +213,12 @@ export default function Chat() {
     // التحقق من وجود المفتاح
     if (!apiKey) {
       console.error(`❌ No API key found for model: ${model}`);
-      return language === 'ar' 
-        ? `❌ مفتاح API غير موجود للنموذج ${model}. الرجاء إضافة المفتاح في ملف .env`
-        : `❌ API key not found for model ${model}. Please add the key in .env file`;
+      return {
+        type: 'text',
+        content: language === 'ar' 
+          ? `❌ مفتاح API غير موجود للنموذج ${model}. الرجاء إضافة المفتاح في ملف .env`
+          : `❌ API key not found for model ${model}. Please add the key in .env file`
+      };
     }
     
     const userContent = [];
@@ -266,7 +270,7 @@ export default function Chat() {
           model: modelName,
           messages: messages,
           temperature: 0.7,
-          max_tokens: 2000
+          max_tokens: 4000
         })
       });
 
@@ -277,7 +281,24 @@ export default function Chat() {
 
       const data = await response.json();
       console.log('✅ Response received');
-      return data.choices[0].message.content;
+      
+      // التحقق مما إذا كان الرد يحتوي على صور (بعض النماذج مثل FLUX)
+      const assistantMessage = data.choices[0].message;
+      
+      // إذا كان الرد متعدد الوسائط (نصوص + صور)
+      if (Array.isArray(assistantMessage.content)) {
+        return {
+          type: 'multimodal',
+          content: assistantMessage.content
+        };
+      }
+      
+      // رد نصي عادي
+      return {
+        type: 'text',
+        content: assistantMessage.content
+      };
+      
     } catch (error) {
       console.error(`❌ Error with ${model}:`, error);
       throw error;
@@ -420,15 +441,48 @@ Respond in ${language === 'ar' ? 'Arabic' : 'English'}.`;
         response = await invokeOpenRouter(selectedModel, fullPrompt, currentFiles);
       }
 
-      const assistantMessage = {
-        role: 'assistant',
-        content: response,
-        timestamp: new Date().toISOString(),
-        model: selectedModel
-      };
+      // تحضير رسالة المساعد حسب نوع الرد (نص أو صور)
+      let assistantMessage;
+      
+      if (response.type === 'multimodal') {
+        // إذا كان الرد متعدد الوسائط (صور + نص)
+        assistantMessage = {
+          role: 'assistant',
+          content: response.content, // هذا array من العناصر (صور ونصوص)
+          timestamp: new Date().toISOString(),
+          model: selectedModel,
+          isMultimodal: true
+        };
+      } else {
+        // رد نصي عادي
+        assistantMessage = {
+          role: 'assistant',
+          content: response.content,
+          timestamp: new Date().toISOString(),
+          model: selectedModel
+        };
+      }
 
       const finalMessages = [...updatedMessages, assistantMessage];
       setMessages(finalMessages);
+
+      // ✅ خصم 2 كريديت بعد الرد الناجح
+      if (user?.email) {
+        const creditsResult = await updateSubscriptionCredits(user.email, 2);
+        if (creditsResult.success) {
+          console.log('✅ 2 credits deducted successfully');
+          
+          // تحديث بيانات الاشتراك محلياً
+          if (subscription) {
+            setSubscription({
+              ...subscription,
+              credits_used: (subscription.credits_used || 0) + 2
+            });
+          }
+        } else {
+          console.warn('⚠️ Failed to deduct credits');
+        }
+      }
 
       // حفظ المحادثة في Firebase
       if (!activeConversation?.id) {
@@ -467,9 +521,6 @@ Respond in ${language === 'ar' ? 'Arabic' : 'English'}.`;
           c.id === activeConversation.id ? updatedConv : c
         ));
       }
-
-      // تحديث الرصيد (هذا يحتاج دالة في firebase.js لتحديث الاشتراك)
-      // await updateSubscriptionCredits(user.email, 2);
 
     } catch (error) {
       console.error('Send error:', error);
@@ -518,7 +569,7 @@ Respond in ${language === 'ar' ? 'Arabic' : 'English'}.`;
     { id: 'STEPFUN', name: 'StepFun', icon: MODEL_ICONS.STEPFUN, description: 'Fast - Files OK', isImage: true },
     { id: 'MISTRAL', name: 'Mistral', icon: MODEL_ICONS.MISTRAL, description: 'Efficient - Files OK', isImage: true },
     { id: 'QWEN', name: 'Qwen 3.5', icon: MODEL_ICONS.QWEN, description: 'Latest - Files OK', isImage: true },
-    { id: 'FLUX', name: 'FLUX.2 Klein', icon: '🎨', description: 'Image Generation - Free', isImage: false }
+    { id: 'FLUX', name: 'FLUX.2 Klein', icon: '🎨', description: 'Image Generation - Paid', isImage: false }
   ];
 
   const currentModel = models.find(m => m.id === selectedModel);
@@ -813,4 +864,3 @@ Respond in ${language === 'ar' ? 'Arabic' : 'English'}.`;
     </div>
   );
 }
-
