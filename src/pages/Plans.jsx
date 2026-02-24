@@ -4,16 +4,17 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, Zap, ArrowLeft, Loader2, AlertCircle, CreditCard } from 'lucide-react';
 
-// استيراد جميع الدوال من base44Client
+// استيراد دوال Firebase
 import { 
-  fetchPlans, 
-  fetchSubscriptions,
+  getAllPlans,
+  getCurrentUser,
+  getUserSubscription,
   createSubscription,
-  updateSubscription,
-  createNotification,
-  createActivityLog,
-  checkAuth 
-} from '@/api/base44Client';
+  updateSubscriptionCredits,
+  createUserNotification,
+  logActivity,
+  getUnreadNotificationsCount
+} from '@/lib/firebase';
 
 // استيراد المكونات
 import { Button } from '@/components/ui/button';
@@ -21,12 +22,24 @@ import { Card } from '@/components/ui/card';
 import { useLanguage } from '@/components/LanguageContext';
 import { createPageUrl } from '@/utils';
 
-// روابط الدفع المباشرة من PayPal
-const PAYPAL_SUBSCRIPTION_LINKS = {
-  starter: 'https://www.paypal.com/webapps/billing/plans/subscribe?plan_id=P-0F579510S2934014XNGLV4MQ',
-  professional: 'https://www.paypal.com/webapps/billing/plans/subscribe?plan_id=P-0AH73100CS833334CNGLV6XY',
-  pro: 'https://www.paypal.com/webapps/billing/plans/subscribe?plan_id=P-31815547WW6875814NGLWAHQ',
-  enterprise: 'https://www.paypal.com/webapps/billing/plans/subscribe?plan_id=P-97834349U9403535ENGLWBFI'
+// روابط الدفع المباشرة من PayPal مع معرفات الخطط
+const PAYPAL_PLANS = {
+  starter: {
+    link: 'https://www.paypal.com/webapps/billing/plans/subscribe?plan_id=P-0F579510S2934014XNGLV4MQ',
+    plan_id: 'P-0F579510S2934014XNGLV4MQ'
+  },
+  professional: {
+    link: 'https://www.paypal.com/webapps/billing/plans/subscribe?plan_id=P-0AH73100CS833334CNGLV6XY',
+    plan_id: 'P-0AH73100CS833334CNGLV6XY'
+  },
+  pro: {
+    link: 'https://www.paypal.com/webapps/billing/plans/subscribe?plan_id=P-31815547WW6875814NGLWAHQ',
+    plan_id: 'P-31815547WW6875814NGLWAHQ'
+  },
+  enterprise: {
+    link: 'https://www.paypal.com/webapps/billing/plans/subscribe?plan_id=P-97834349U9403535ENGLWBFI',
+    plan_id: 'P-97834349U9403535ENGLWBFI'
+  }
 };
 
 export default function Plans() {
@@ -42,51 +55,73 @@ export default function Plans() {
   const [subscribing, setSubscribing] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // دالة للتحقق من أن الاشتراك لا يزال نشطاً
+  const checkSubscriptionActive = (subscription) => {
+    if (!subscription) return false;
+    
+    // التحقق من حالة الاشتراك
+    if (subscription.status !== 'active') return false;
+    
+    // التحقق من تاريخ الانتهاء
+    if (subscription.end_date) {
+      const endDate = new Date(subscription.end_date);
+      const now = new Date();
+      if (endDate < now) return false;
+    }
+    
+    return true;
+  };
 
   // تحميل البيانات عند بدء الصفحة
   useEffect(() => {
     loadData();
   }, []);
 
-  // دالة تحميل البيانات
+  // دالة تحميل البيانات من Firebase
   const loadData = async () => {
     try {
       setLoading(true);
       setError(null);
       
-      console.log('بدء تحميل البيانات...');
+      console.log('📥 بدء تحميل البيانات من Firebase...');
       
-      // 1. التحقق من المستخدم
-      const currentUser = await checkAuth();
-      console.log('المستخدم الحالي:', currentUser);
+      // 1. التحقق من المستخدم الحالي من sessionStorage
+      const currentUser = getCurrentUser();
+      console.log('👤 المستخدم الحالي:', currentUser);
       setUser(currentUser);
 
-      // 2. جلب جميع الخطط النشطة
-      console.log('جاري جلب الخطط...');
-      const allPlans = await fetchPlans({ is_active: true });
-      console.log('الخطط المستلمة:', allPlans);
+      // 2. جلب جميع الخطط من Firebase
+      console.log('📋 جاري جلب الخطط...');
+      const allPlans = await getAllPlans();
+      console.log('📦 الخطط المستلمة:', allPlans);
+      
+      // فلترة الخطط النشطة فقط
+      const activePlans = allPlans.filter(plan => plan.is_active === true);
       
       // ترتيب الخطط حسب حقل order
-      const sortedPlans = allPlans.sort((a, b) => (a.order || 0) - (b.order || 0));
+      const sortedPlans = activePlans.sort((a, b) => (a.order || 0) - (b.order || 0));
       setPlans(sortedPlans);
 
-      // 3. جلب اشتراكات المستخدم إذا كان موجوداً
+      // 3. جلب اشتراك المستخدم إذا كان موجوداً
       if (currentUser?.email) {
-        console.log('جاري جلب اشتراكات المستخدم:', currentUser.email);
-        const subscriptions = await fetchSubscriptions({ 
-          user_email: currentUser.email, 
-          status: 'active' 
-        });
+        console.log('🔍 جاري جلب اشتراك المستخدم:', currentUser.email);
+        const subscription = await getUserSubscription(currentUser.email);
         
-        console.log('الاشتراكات المستلمة:', subscriptions);
+        console.log('📦 الاشتراك المستلم:', subscription);
         
-        if (subscriptions.length > 0) {
-          setCurrentSubscription(subscriptions[0]);
+        if (subscription && checkSubscriptionActive(subscription)) {
+          setCurrentSubscription(subscription);
         }
+        
+        // جلب عدد الإشعارات غير المقروءة
+        const count = await getUnreadNotificationsCount(currentUser.email);
+        setUnreadCount(count);
       }
 
     } catch (error) {
-      console.error('خطأ في تحميل البيانات:', error);
+      console.error('❌ خطأ في تحميل البيانات:', error);
       setError(language === 'ar' 
         ? 'حدث خطأ في تحميل البيانات' 
         : 'Error loading data'
@@ -96,69 +131,141 @@ export default function Plans() {
     }
   };
 
-  // دالة فتح رابط الدفع المباشر
-  const handleSubscribeClick = (plan) => {
-    if (!user) {
-      alert(language === 'ar' ? 'يرجى تسجيل الدخول أولاً' : 'Please login first');
-      return;
+  // دالة للبحث عن خطة PayPal المناسبة
+  const findPayPalPlan = (plan) => {
+    // البحث المباشر بالـ id
+    if (PAYPAL_PLANS[plan.id]) {
+      return PAYPAL_PLANS[plan.id];
     }
-
-    if (currentSubscription && currentSubscription.plan_id !== 'free') {
-      alert(language === 'ar' 
-        ? 'لديك اشتراك نشط بالفعل' 
-        : 'You already have an active subscription'
-      );
-      return;
-    }
-
-    // 🔍 للتشخيص - شوف قيمة plan.id
-    console.log('🔍 Selected plan ID:', plan.id);
-    console.log('🔍 Available links:', Object.keys(PAYPAL_SUBSCRIPTION_LINKS));
     
-    // محاولة الحصول على الرابط بعدة طرق
-    let paypalLink = PAYPAL_SUBSCRIPTION_LINKS[plan.id];
-    
-    // إذا لم يجد، جرب بأسماء بديلة
-    if (!paypalLink) {
-      // خريطة للأسماء البديلة
-      const alternativeNames = {
-        'starter': ['starter', 'basic', 'Starter'],
-        'professional': ['professional', 'Professional', 'pro'],
-        'pro': ['pro', 'Pro', 'professional'],
-        'enterprise': ['enterprise', 'Enterprise', 'business']
-      };
-      
-      // ابحث في الأسماء البديلة
-      for (const [key, alternatives] of Object.entries(alternativeNames)) {
-        if (alternatives.includes(plan.id) || alternatives.includes(plan.name_en?.toLowerCase())) {
-          paypalLink = PAYPAL_SUBSCRIPTION_LINKS[key];
-          console.log(`✅ Found alternative match: ${key} for ${plan.id}`);
-          break;
-        }
+    // البحث بالاسم الإنجليزي
+    for (const [key, value] of Object.entries(PAYPAL_PLANS)) {
+      if (plan.name_en?.toLowerCase().includes(key) || 
+          key.includes(plan.name_en?.toLowerCase())) {
+        return value;
       }
     }
     
-    if (!paypalLink) {
-      console.error('❌ No PayPal link found for plan:', plan);
+    // البحث بالاسم العربي
+    const arabicNames = {
+      starter: ['بداية', 'أساسية'],
+      professional: ['احترافية', 'متقدمة'],
+      pro: ['محترف', 'متقدم'],
+      enterprise: ['مؤسسات', 'شركات']
+    };
+    
+    for (const [key, alternatives] of Object.entries(arabicNames)) {
+      if (alternatives.some(name => plan.name_ar?.includes(name))) {
+        return PAYPAL_PLANS[key];
+      }
+    }
+    
+    return null;
+  };
+
+  // دالة فتح رابط الدفع المباشر
+  const handleSubscribeClick = async (plan) => {
+    if (!user) {
+      alert(language === 'ar' ? 'يرجى تسجيل الدخول أولاً' : 'Please login first');
+      navigate(createPageUrl('SignIn'));
+      return;
+    }
+
+    // التحقق من وجود اشتراك نشط
+    if (currentSubscription && checkSubscriptionActive(currentSubscription)) {
       alert(language === 'ar' 
-        ? `رابط الدفع غير متوفر لهذه الخطة: ${plan.id} - ${plan.name_en}` 
-        : `Payment link not available for this plan: ${plan.id} - ${plan.name_en}`
+        ? 'لديك اشتراك نشط بالفعل. لا يمكنك الاشتراك في باقة جديدة حتى ينتهي اشتراكك الحالي.' 
+        : 'You already have an active subscription. You cannot subscribe to a new plan until your current subscription expires.'
       );
       return;
     }
 
-    // فتح نافذة الدفع
-    window.open(paypalLink, '_blank');
+    // البحث عن خطة PayPal المناسبة
+    const paypalPlan = findPayPalPlan(plan);
     
-    alert(language === 'ar' 
-      ? '✅ تم فتح صفحة الدفع. بعد إتمام الدفع، ارجع إلى الموقع وسيتم تفعيل اشتراكك تلقائياً.' 
-      : '✅ Payment page opened. After completing payment, return to the site and your subscription will be activated automatically.'
-    );
-    
+    if (!paypalPlan) {
+      console.error('❌ No PayPal plan found for:', plan);
+      alert(language === 'ar' 
+        ? `رابط الدفع غير متوفر لهذه الخطة: ${plan.name_ar || plan.name_en}` 
+        : `Payment link not available for this plan: ${plan.name_en}`
+      );
+      return;
+    }
+
     setSelectedPlan(plan);
-    
-    // هنا يمكنك إضافة منطق للتحقق من الدفع بعد العودة
-    // (سيحتاج إلى webhook من PayPal)
+    setSubscribing(true);
+
+    try {
+      // ✅ 1. إنشاء اشتراك في Firebase بحالة pending
+      console.log('📝 Creating pending subscription...');
+      const subscriptionData = {
+        user_email: user.email,
+        plan_id: plan.id,
+        plan_name: language === 'ar' ? plan.name_ar : plan.name_en,
+        credits_total: plan.credits,
+        credits_used: 0,
+        tokens_per_question: plan.tokens_per_question || 500,
+        start_date: new Date().toISOString(),
+        end_date: plan.billing_cycle === 'yearly' 
+          ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()
+          : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        status: 'pending', // pending حتى يتم تأكيد الدفع
+        amount_paid: plan.price,
+        paypal_plan_id: paypalPlan.plan_id
+      };
+      
+      const newSub = await createSubscription(subscriptionData);
+      
+      if (newSub.success) {
+        console.log('✅ Pending subscription created with ID:', newSub.id);
+        
+        // ✅ 2. إنشاء إشعار للمستخدم
+        await createUserNotification({
+          user_email: user.email,
+          type: 'subscription',
+          title_en: 'Payment Initiated',
+          title_ar: 'بدأ عملية الدفع',
+          message_en: `You have initiated payment for the ${plan.name_en} plan. Your subscription will be activated once payment is confirmed.`,
+          message_ar: `لقد بدأت عملية دفع لباقة ${plan.name_ar || plan.name_en}. سيتم تفعيل اشتراكك بعد تأكيد الدفع.`
+        });
+        
+        // ✅ 3. تسجيل النشاط
+        await logActivity({
+          action: 'subscription_initiated',
+          user_email: user.email,
+          details: `User initiated payment for plan: ${plan.name_en} (ID: ${plan.id})`
+        });
+        
+        // ✅ 4. فتح نافذة الدفع
+        window.open(paypalPlan.link, '_blank');
+        
+        // ✅ 5. عرض رسالة نجاح
+        setPaymentSuccess(true);
+        setTimeout(() => setPaymentSuccess(false), 5000);
+        
+        alert(language === 'ar' 
+          ? '✅ تم فتح صفحة الدفع. سيتم تفعيل اشتراكك تلقائياً بعد تأكيد الدفع.' 
+          : '✅ Payment page opened. Your subscription will be activated automatically after payment confirmation.'
+        );
+        
+        // إعادة تحميل البيانات بعد 10 ثواني (للتحقق من تحديث الاشتراك)
+        setTimeout(() => {
+          loadData();
+        }, 10000);
+        
+      } else {
+        throw new Error('Failed to create subscription');
+      }
+      
+    } catch (error) {
+      console.error('❌ Error during subscription:', error);
+      alert(language === 'ar' 
+        ? 'حدث خطأ في عملية الاشتراك' 
+        : 'Error during subscription process'
+      );
+    } finally {
+      setSubscribing(false);
+    }
   };
 
   // عرض شاشة التحميل
@@ -207,7 +314,7 @@ export default function Plans() {
               className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2"
             >
               <Check className="w-5 h-5" />
-              {language === 'ar' ? 'تم الاشتراك بنجاح!' : 'Subscription successful!'}
+              {language === 'ar' ? 'تم بدء عملية الدفع بنجاح!' : 'Payment initiated successfully!'}
             </motion.div>
           )}
         </AnimatePresence>
@@ -227,6 +334,18 @@ export default function Plans() {
             <p className="text-sm text-slate-600 dark:text-slate-400">
               {language === 'ar' ? 'مرحباً' : 'Welcome'}, {user.email}
             </p>
+            {currentSubscription && (
+              <div className="mt-1">
+                <p className="text-xs text-green-600 dark:text-green-400">
+                  {language === 'ar' ? 'باقتك الحالية:' : 'Your current plan:'} {currentSubscription.plan_name}
+                </p>
+                {currentSubscription.end_date && (
+                  <p className="text-xs text-slate-500">
+                    {language === 'ar' ? 'تنتهي في:' : 'Expires:'} {new Date(currentSubscription.end_date).toLocaleDateString()}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -254,8 +373,9 @@ export default function Plans() {
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             {plans.map((plan, index) => {
-              const isCurrentPlan = currentSubscription?.plan_id === plan.id;
+              const isCurrentPlan = currentSubscription?.plan_id === plan.id && checkSubscriptionActive(currentSubscription);
               const isYearly = plan.billing_cycle === 'yearly';
+              const isDisabled = isCurrentPlan || subscribing;
               
               return (
                 <motion.div
@@ -340,7 +460,7 @@ export default function Plans() {
                     <div className="p-6 pt-0">
                       <Button
                         onClick={() => handleSubscribeClick(plan)}
-                        disabled={isCurrentPlan || subscribing}
+                        disabled={isDisabled}
                         className={`w-full ${
                           isCurrentPlan 
                             ? 'bg-green-500 hover:bg-green-600 text-white cursor-default' 
