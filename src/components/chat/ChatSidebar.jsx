@@ -265,7 +265,7 @@ export default function ChatSidebar({
 
       {/* Profile Edit Modal */}
       <Dialog open={showProfileModal} onOpenChange={setShowProfileModal}>
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto bg-white dark:bg-slate-900">
           <DialogHeader>
             <DialogTitle className="text-xl">
               {editingProfile 
@@ -677,3 +677,4 @@ export default function ChatSidebar({
     </div>
   );
 }
+
