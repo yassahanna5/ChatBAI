@@ -265,7 +265,7 @@ export default function ChatSidebar({
 
       {/* Profile Edit Modal */}
       <Dialog open={showProfileModal} onOpenChange={setShowProfileModal}>
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto bg-white dark:bg-slate-900">
           <DialogHeader>
             <DialogTitle className="text-xl">
               {editingProfile 
@@ -514,7 +514,7 @@ export default function ChatSidebar({
                   <select
                     value={profileForm.gender}
                     onChange={(e) => setProfileForm({ ...profileForm, gender: e.target.value })}
-                    className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+                    className="w-full px-3 py-2 bg-[#1995AD] text-white border border-[#1995AD] rounded-lg"
                   >
                     <option value="">{language === 'ar' ? 'اختر' : 'Select'}</option>
                     <option value="male">{language === 'ar' ? 'ذكر' : 'Male'}</option>
@@ -543,7 +543,7 @@ export default function ChatSidebar({
                   <select
                     value={profileForm.company_size}
                     onChange={(e) => setProfileForm({ ...profileForm, company_size: e.target.value })}
-                    className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+                    className="w-full px-3 py-2 bg-[#1995AD] text-white border border-[#1995AD] rounded-lg"
                   >
                     <option value="">{language === 'ar' ? 'اختر' : 'Select'}</option>
                     <option value="1-10">1-10</option>
