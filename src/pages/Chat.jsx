@@ -51,6 +51,8 @@ const OPENROUTER_MODELS = {
   STEPFUN: 'stepfun/step-3.5-flash'
 };
 
+const MAKE_WEBHOOK_URL = import.meta.env.VITE_MAKE_DESIGN_WEBHOOK || 'https://hook.eu1.make.com/omn3s8oo2bmqyecvfn70kddtpmbn62ke';
+
 // التحقق من وجود المفاتيح في بيئة التطوير
 if (import.meta.env.DEV) {
   console.log('🔑 OpenRouter API Keys Status:', {
@@ -251,7 +253,11 @@ export default function Chat() {
     const messages = [
       {
         role: 'system',
-        content: `You are an expert business AI consultant. Respond in ${language === 'ar' ? 'Arabic' : 'English'} with detailed, professional analysis.`
+        content: `You are an expert business AI consultant.
+Only answer within the user's business profile context.
+If user asks anything unrelated to their profile/business context, refuse politely and ask them to update profile or ask business-specific questions.
+Always respond in ${language === 'ar' ? 'Arabic' : 'English'}.
+Format responses in clear sections and bullet points, with concise and actionable recommendations.`
       },
       {
         role: 'user',
@@ -273,8 +279,8 @@ export default function Chat() {
         body: JSON.stringify({
           model: modelName,
           messages: messages,
-          temperature: 0.7,
-          max_tokens: 4000
+          temperature: 0.2,
+          max_tokens: 1800
         })
       });
 
@@ -397,6 +403,58 @@ export default function Chat() {
     handleSendMessage(prompt);
   };
 
+  const buildUserProfilePayload = () => ({
+    user_id: user?.id || '',
+    email: user?.email || '',
+    full_name: user?.full_name || '',
+    phone: user?.phone || '',
+    gender: user?.gender || '',
+    birth_date: user?.birth_date || '',
+    business_name: user?.business_name || '',
+    business_type: user?.business_type || '',
+    industry: user?.industry || '',
+    company_size: user?.company_size || '',
+    website: user?.website || '',
+    monthly_budget: user?.monthly_budget || '',
+    country: user?.country || '',
+    city: user?.city || '',
+    target_audience: user?.target_audience || '',
+    current_challenges: user?.current_challenges || '',
+    goals: user?.goals || '',
+    competitors: user?.competitors || '',
+    social_platforms: user?.social_platforms || ''
+  });
+
+  const sendDesignRequestToMake = async (promptText) => {
+    const payload = {
+      action: 'create_design',
+      source: 'chatbai_chat',
+      language,
+      prompt: promptText,
+      user_profile: buildUserProfilePayload(),
+      requested_assets: [
+        'social_media_designs',
+        'banners',
+        'logo',
+        'posts',
+        'business_cards',
+        'brochures',
+        'ads_images'
+      ],
+      timestamp: new Date().toISOString()
+    };
+
+    const response = await fetch(MAKE_WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Webhook error (${response.status})`);
+    }
+  };
+
   const handleSendMessage = async (content) => {
     if (!subscription || subscription.credits_used >= subscription.credits_total || !content.trim() || !user) {
       return;
@@ -467,14 +525,69 @@ User's new question: ${content}
 ${currentFiles.length > 0 ? `\n📎 Attached ${currentFiles.length} file(s) for analysis.` : ''}
 
 Instructions:
-1. Use the user's profile information to provide personalized responses
-2. Consider their industry, goals, and challenges when answering
-3. Tailor your advice to their specific business context
-4. If they mention their company, reference their profile data
-5. Provide actionable insights based on their situation
-6. Be professional and helpful
+1. Use ONLY the user's profile and business context to answer.
+2. If question is outside business/profile scope, refuse politely.
+3. Consider industry, goals, challenges, audience, and budget.
+4. Tailor advice to this exact user's profile only.
+5. Provide organized sections with bullet points and practical steps.
+6. Keep writing clear, accurate, and professional with no spelling mistakes.
+7. Answer concisely but with enough depth.
 
 Respond in ${language === 'ar' ? 'Arabic' : 'English'} with detailed, professional analysis.`;
+
+      if (selectedModel === 'DESIGN') {
+        await sendDesignRequestToMake(content);
+
+        const assistantMessage = {
+          role: 'assistant',
+          content: language === 'ar'
+            ? '✅ تم استلام طلب **Create a Design** وإرساله لنظام التصميم. سيتم تجهيز تصميمات مخصصة بناءً على بيانات بروفايلك (سوشيال ميديا، بنرات، لوجو، منشورات، كروت، بروشورات وإعلانات).'
+            : '✅ Your **Create a Design** request was sent successfully. Personalized assets will be prepared based on your profile data (social media designs, banners, logo, posts, business cards, brochures, and ad visuals).',
+          timestamp: new Date().toISOString(),
+          model: selectedModel
+        };
+
+        const finalMessages = [...updatedMessages, assistantMessage];
+        setMessages(finalMessages);
+
+        if (!activeConversation?.id) {
+          const newConv = await createConversation({
+            user_email: user.email,
+            title: content.slice(0, 50),
+            messages: finalMessages
+          });
+
+          if (newConv.success) {
+            const newConversation = {
+              id: newConv.id,
+              user_email: user.email,
+              title: content.slice(0, 50),
+              messages: finalMessages,
+              createdAt: new Date().toISOString()
+            };
+            setActiveConversation(newConversation);
+            setConversations([newConversation, ...conversations]);
+          }
+        } else {
+          const updatedConv = {
+            ...activeConversation,
+            messages: finalMessages,
+            title: activeConversation.title.startsWith('New') ? content.slice(0, 50) : activeConversation.title
+          };
+
+          for (const msg of [userMessage, assistantMessage]) {
+            await addMessageToConversation(activeConversation.id, msg);
+          }
+
+          setActiveConversation(updatedConv);
+          setConversations(conversations.map(c =>
+            c.id === activeConversation.id ? updatedConv : c
+          ));
+        }
+
+        setSending(false);
+        return;
+      }
 
       let response = await invokeOpenRouter(selectedModel, fullPrompt, currentFiles);
 
@@ -601,7 +714,8 @@ Respond in ${language === 'ar' ? 'Arabic' : 'English'} with detailed, profession
     { id: 'QWEN', name: 'Qwen3 Coder', icon: MODEL_ICONS.QWEN, description: '480B Coder - Powerful', isImage: true },
     { id: 'OPENAI', name: 'GPT-OSS 120B', icon: MODEL_ICONS.OPENAI, description: 'Open Source GPT', isImage: true },
     { id: 'MISTRAL', name: 'Mistral Small 3.1', icon: MODEL_ICONS.MISTRAL, description: '24B - Efficient', isImage: true },
-    { id: 'STEPFUN', name: 'Step 3.5 Flash', icon: MODEL_ICONS.STEPFUN, description: 'Fast & Responsive', isImage: true }
+    { id: 'STEPFUN', name: 'Step 3.5 Flash', icon: MODEL_ICONS.STEPFUN, description: 'Fast & Responsive', isImage: true },
+    { id: 'DESIGN', name: 'Create a Design', icon: '🎨', description: language === 'ar' ? 'إرسال طلب تصميم إلى Make.com' : 'Send design request to Make.com', isImage: false }
   ];
 
   const currentModel = models.find(m => m.id === selectedModel);
