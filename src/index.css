@@ -95,9 +95,9 @@
   select:-webkit-autofill,
   select:-webkit-autofill:hover,
   select:-webkit-autofill:focus {
-    -webkit-text-fill-color: #ffffff !important;
-    box-shadow: 0 0 0px 1000px #1995AD inset !important;
-    -webkit-box-shadow: 0 0 0px 1000px #1995AD inset !important;
-    caret-color: #ffffff !important;
+    -webkit-text-fill-color: #0f172a !important;
+    box-shadow: 0 0 0px 1000px #A1D6E2 inset !important;
+    -webkit-box-shadow: 0 0 0px 1000px #A1D6E2 inset !important;
+    caret-color: #0f172a !important;
   }
 }

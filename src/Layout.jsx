@@ -13,12 +13,12 @@ export default function Layout({ children }) {
           <meta name="color-scheme" content="light dark" />
           <style>{`
             :root {
-              --background: 255 255 255;
-              --foreground: 15 23 42;
+              --background: 0 0% 100%;
+              --foreground: 0 0% 3.9%;
             }
             .dark {
-              --background: 15 23 42;
-              --foreground: 248 250 252;
+              --background: 0 0% 3.9%;
+              --foreground: 0 0% 98%;
             }
 
             /* Global responsive reset */
@@ -33,16 +33,6 @@ export default function Layout({ children }) {
               background-color: transparent !important;
               overflow-x: hidden;
               max-width: 100vw;
-            }
-
-            /* Kill yellow backgrounds */
-            [style*="background: yellow"],
-            [style*="background: #ff0"],
-            [style*="background: #ffff00"],
-            [class*="bg-yellow"],
-            footer, .bottom-nav, [class*="navigation"], [class*="footer"] {
-              background: transparent !important;
-              background-color: transparent !important;
             }
 
             /* Responsive images */

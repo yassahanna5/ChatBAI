@@ -272,13 +272,8 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between py-4">
             
-            {/* Logo */}
+            {/* Brand */}
             <div className="flex items-center gap-3 flex-shrink-0">
-              <img 
-                src="/assets/images/logo.jpg"
-                alt="ChatBAI Logo"
-                className="w-10 h-10 object-contain rounded-lg"
-              />
               <span className="text-xl font-bold bg-gradient-to-r from-[#1995AD] to-[#A1D6E2] bg-clip-text text-transparent whitespace-nowrap">
                 ChatBAI
               </span>
@@ -599,11 +594,6 @@ export default function Home() {
             {/* Brand */}
             <div>
               <div className="flex items-center gap-3 mb-4">
-                <img 
-                  src="/assets/images/logo.jpg"
-                  alt="ChatBAI Logo"
-                  className="w-10 h-10 object-contain rounded-lg"
-                />
                 <span className="text-xl font-bold bg-gradient-to-r from-[#1995AD] to-[#A1D6E2] bg-clip-text text-transparent">
                   ChatBAI
                 </span>

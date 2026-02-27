@@ -1304,7 +1304,7 @@ export default function Admin() {
 
       {/* Notifications Dialog - بدون خلفية صفراء ✅ */}
       <Dialog open={showNotificationsDialog} onOpenChange={setShowNotificationsDialog}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg bg-white dark:bg-slate-900">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Bell className="w-5 h-5" />
@@ -1378,7 +1378,7 @@ export default function Admin() {
 
       {/* User Modal */}
       <Dialog open={showUserModal} onOpenChange={setShowUserModal}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg bg-white dark:bg-slate-900">
           <DialogHeader>
             <DialogTitle>
               {editingUser 
@@ -1487,7 +1487,7 @@ export default function Admin() {
 
       {/* Plan Modal */}
       <Dialog open={showPlanModal} onOpenChange={setShowPlanModal}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg bg-white dark:bg-slate-900">
           <DialogHeader>
             <DialogTitle>
               {selectedItem 

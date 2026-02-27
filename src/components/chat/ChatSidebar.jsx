@@ -514,7 +514,7 @@ export default function ChatSidebar({
                   <select
                     value={profileForm.gender}
                     onChange={(e) => setProfileForm({ ...profileForm, gender: e.target.value })}
-                    className="w-full px-3 py-2 bg-[#1995AD] text-white border border-[#1995AD] rounded-lg"
+                    className="w-full px-3 py-2 bg-[#A1D6E2] text-slate-900 border border-[#A1D6E2] rounded-lg"
                   >
                     <option value="">{language === 'ar' ? 'اختر' : 'Select'}</option>
                     <option value="male">{language === 'ar' ? 'ذكر' : 'Male'}</option>
@@ -543,7 +543,7 @@ export default function ChatSidebar({
                   <select
                     value={profileForm.company_size}
                     onChange={(e) => setProfileForm({ ...profileForm, company_size: e.target.value })}
-                    className="w-full px-3 py-2 bg-[#1995AD] text-white border border-[#1995AD] rounded-lg"
+                    className="w-full px-3 py-2 bg-[#A1D6E2] text-slate-900 border border-[#A1D6E2] rounded-lg"
                   >
                     <option value="">{language === 'ar' ? 'اختر' : 'Select'}</option>
                     <option value="1-10">1-10</option>
