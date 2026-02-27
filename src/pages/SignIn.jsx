@@ -85,11 +85,6 @@ export default function SignIn() {
 
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center gap-3 mb-4">
-            <img
-              src="/assets/images/logo.jpg" 
-              alt="ChatBAI Logo"
-              className="w-12 h-12 object-contain rounded-lg"
-            />
             <span className="text-2xl font-bold bg-gradient-to-r from-[#1995AD] to-[#A1D6E2] bg-clip-text text-transparent">
               ChatBAI
             </span>
