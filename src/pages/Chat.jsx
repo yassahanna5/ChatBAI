@@ -51,6 +51,24 @@ const OPENROUTER_MODELS = {
   STEPFUN: 'stepfun/step-3.5-flash'
 };
 
+const BUSINESS_INTELLIGENCE_FRAMEWORK = `Core services you must cover:
+1) Market analysis and target audience identification
+2) Marketing strategy building
+3) Content production and management
+4) Performance tracking and analysis
+5) Continuous improvement
+
+Mandatory depth:
+- Analyze company/services, audience behavior, demand trends, competitors, pain points, growth opportunities.
+- Identify segments by age, interests, purchasing power, buying behavior, and geography.
+- Build buyer personas and channel recommendations.
+- Provide KPI interpretation, strengths/weaknesses, and practical optimization actions.
+
+Output quality:
+- No hallucinations. If data is missing, say exactly what is missing and label assumptions clearly.
+- Keep recommendations strictly tied to profile data and business context.
+- Use clear sections, bullets, and actionable steps.`;
+
 const STABILITY_KEY = import.meta.env.VITE_STABILITY_KEY || '';
 const HF_TOKEN = import.meta.env.VITE_HF_TOKEN || '';
 const AIHORDE_KEY = import.meta.env.VITE_AIHORDE_KEY || '';
@@ -260,7 +278,7 @@ export default function Chat() {
 Only answer within the user's business profile context.
 If user asks anything unrelated to their profile/business context, refuse politely and ask them to update profile or ask business-specific questions.
 Always respond in ${language === 'ar' ? 'Arabic' : 'English'}.
-Format responses in clear sections and bullet points, with concise and actionable recommendations.`
+${BUSINESS_INTELLIGENCE_FRAMEWORK}`
       },
       {
         role: 'user',
@@ -718,9 +736,27 @@ Instructions:
 2. If question is outside business/profile scope, refuse politely.
 3. Consider industry, goals, challenges, audience, and budget.
 4. Tailor advice to this exact user's profile only.
-5. Provide organized sections with bullet points and practical steps.
-6. Keep writing clear, accurate, and professional with no spelling mistakes.
-7. Answer concisely but with enough depth.
+5. Cover the 5 core services in your analysis when relevant:
+   - Market analysis and audience identification
+   - Marketing strategy building
+   - Content production and management
+   - Performance tracking and analysis
+   - Continuous improvement
+6. Include audience insights (age, interests, purchasing power, behavior, geography), buyer persona, competitor insights, market trends, strengths/weaknesses, opportunities and risks.
+7. Provide practical strategy: channels, campaign ideas, content angles, post/video description suggestions, KPI plan, and optimization actions.
+8. Keep writing clear, accurate, and professional with no spelling mistakes.
+9. If profile/business data is missing, explicitly list missing fields and continue with labeled assumptions.
+10. Add an "Export-Ready Report" section at the end so user can save/download it as a report.
+
+Mandatory output structure:
+A) Executive Summary
+B) Market & Audience Analysis
+C) Buyer Personas
+D) Marketing Strategy (channels + quick wins)
+E) Content Plan (platform-specific)
+F) Performance Tracking Plan (KPIs + diagnostics)
+G) Continuous Improvement Plan (7/30/90 days)
+H) Export-Ready Report
 
 Respond in ${language === 'ar' ? 'Arabic' : 'English'} with detailed, professional analysis.`;
 
