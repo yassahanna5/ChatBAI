@@ -51,7 +51,9 @@ const OPENROUTER_MODELS = {
   STEPFUN: 'stepfun/step-3.5-flash'
 };
 
-const MAKE_WEBHOOK_URL = import.meta.env.VITE_MAKE_DESIGN_WEBHOOK || 'https://hook.eu1.make.com/omn3s8oo2bmqyecvfn70kddtpmbn62ke';
+const STABILITY_KEY = import.meta.env.VITE_STABILITY_KEY || '';
+const HF_TOKEN = import.meta.env.VITE_HF_TOKEN || '';
+const AIHORDE_KEY = import.meta.env.VITE_AIHORDE_KEY || '';
 
 // التحقق من وجود المفاتيح في بيئة التطوير
 if (import.meta.env.DEV) {
@@ -425,34 +427,134 @@ Format responses in clear sections and bullet points, with concise and actionabl
     social_platforms: user?.social_platforms || ''
   });
 
-  const sendDesignRequestToMake = async (promptText) => {
-    const payload = {
-      action: 'create_design',
-      source: 'chatbai_chat',
-      language,
-      prompt: promptText,
-      user_profile: buildUserProfilePayload(),
-      requested_assets: [
-        'social_media_designs',
-        'banners',
-        'logo',
-        'posts',
-        'business_cards',
-        'brochures',
-        'ads_images'
-      ],
-      timestamp: new Date().toISOString()
-    };
+  const buildDesignPrompt = (userPrompt) => {
+    const p = buildUserProfilePayload();
+    return `Create a professional marketing design based on this business profile:
+Business Name: ${p.business_name || 'N/A'}
+Business Type: ${p.business_type || 'N/A'}
+Industry: ${p.industry || 'N/A'}
+Target Audience: ${p.target_audience || 'N/A'}
+Goals: ${p.goals || 'N/A'}
+Current Challenges: ${p.current_challenges || 'N/A'}
+Country/City: ${p.country || 'N/A'} / ${p.city || 'N/A'}
+Brand Context: ${p.competitors || 'N/A'}
+Preferred Platforms: ${p.social_platforms || 'N/A'}
+Monthly Budget: ${p.monthly_budget || 'N/A'}
 
-    const response = await fetch(MAKE_WEBHOOK_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
+User design request:
+${userPrompt}
 
-    if (!response.ok) {
-      throw new Error(`Webhook error (${response.status})`);
+Generate high-quality visuals suitable for social media, banners, logos, and ad creatives.`;
+  };
+
+  const pollAIHordeResult = async (requestId) => {
+    const statusUrl = `https://aihorde.net/api/v2/generate/status/${requestId}`;
+    for (let i = 0; i < 20; i++) {
+      const res = await fetch(statusUrl);
+      const data = await res.json();
+      if (data.done && data.generations?.length > 0) {
+        return data.generations[0].img;
+      }
+      await new Promise(resolve => setTimeout(resolve, 3000));
     }
+    throw new Error('AI Horde timeout');
+  };
+
+  const generateDesignsFromProviders = async (userPrompt) => {
+    const prompt = buildDesignPrompt(userPrompt);
+    const results = [];
+
+    if (STABILITY_KEY) {
+      try {
+        const form = new FormData();
+        form.append('prompt', prompt);
+        form.append('output_format', 'png');
+        form.append('aspect_ratio', '1:1');
+
+        const res = await fetch('https://api.stability.ai/v2beta/stable-image/generate/ultra', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${STABILITY_KEY}`,
+            Accept: 'image/*'
+          },
+          body: form
+        });
+
+        if (res.ok) {
+          const blob = await res.blob();
+          results.push({ name: 'Design 1', url: URL.createObjectURL(blob) });
+        }
+      } catch (error) {
+        console.error('Stability provider failed:', error);
+      }
+    }
+
+    if (HF_TOKEN) {
+      try {
+        const res = await fetch('https://router.huggingface.co/hf-inference/models/stabilityai/stable-diffusion-xl-base-1.0', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${HF_TOKEN}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            inputs: prompt,
+            parameters: {
+              num_inference_steps: 40,
+              guidance_scale: 8.5,
+              width: 768,
+              height: 768
+            }
+          })
+        });
+
+        if (res.ok) {
+          const blob = await res.blob();
+          results.push({ name: 'Design 2', url: URL.createObjectURL(blob) });
+        }
+      } catch (error) {
+        console.error('Hugging Face provider failed:', error);
+      }
+    }
+
+    if (AIHORDE_KEY) {
+      try {
+        const queueRes = await fetch('https://aihorde.net/api/v2/generate/async', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: AIHORDE_KEY,
+            'Client-Agent': 'ChatBAI:1.0'
+          },
+          body: JSON.stringify({
+            prompt,
+            params: {
+              sampler_name: 'DDIM',
+              cfg_scale: 7.5,
+              height: 512,
+              width: 512,
+              steps: 30,
+              n: 1
+            },
+            nsfw: false,
+            trusted_workers: false,
+            slow_workers: true
+          })
+        });
+
+        if (queueRes.ok) {
+          const queueData = await queueRes.json();
+          const imageUrl = await pollAIHordeResult(queueData.id);
+          if (imageUrl) {
+            results.push({ name: 'Design 3', url: imageUrl });
+          }
+        }
+      } catch (error) {
+        console.error('AI Horde provider failed:', error);
+      }
+    }
+
+    return results;
   };
 
   const handleSendMessage = async (content) => {
@@ -536,13 +638,23 @@ Instructions:
 Respond in ${language === 'ar' ? 'Arabic' : 'English'} with detailed, professional analysis.`;
 
       if (selectedModel === 'DESIGN') {
-        await sendDesignRequestToMake(content);
+        const generatedDesigns = await generateDesignsFromProviders(content);
+
+        if (!generatedDesigns.length) {
+          throw new Error(language === 'ar'
+            ? 'تعذر إنشاء التصميمات. تأكد من إعداد مفاتيح البيئة (VITE_STABILITY_KEY / VITE_HF_TOKEN / VITE_AIHORDE_KEY).'
+            : 'Failed to generate designs. Please configure env keys (VITE_STABILITY_KEY / VITE_HF_TOKEN / VITE_AIHORDE_KEY).');
+        }
+
+        const designsMarkdown = generatedDesigns
+          .map((item, idx) => `### ${language === 'ar' ? `تصميم ${idx + 1}` : `Design ${idx + 1}`}\n![${item.name}](${item.url})`)
+          .join('\n\n');
 
         const assistantMessage = {
           role: 'assistant',
           content: language === 'ar'
-            ? '✅ تم استلام طلب **Create a Design** وإرساله لنظام التصميم. سيتم تجهيز تصميمات مخصصة بناءً على بيانات بروفايلك (سوشيال ميديا، بنرات، لوجو، منشورات، كروت، بروشورات وإعلانات).'
-            : '✅ Your **Create a Design** request was sent successfully. Personalized assets will be prepared based on your profile data (social media designs, banners, logo, posts, business cards, brochures, and ad visuals).',
+            ? `✅ تم إنشاء تصميمات مخصصة تلقائيًا بناءً على بروفايلك وطلبك.\n\n${designsMarkdown}`
+            : `✅ Personalized designs were generated automatically based on your profile and prompt.\n\n${designsMarkdown}`,
           timestamp: new Date().toISOString(),
           model: selectedModel
         };
@@ -715,7 +827,7 @@ Respond in ${language === 'ar' ? 'Arabic' : 'English'} with detailed, profession
     { id: 'OPENAI', name: 'GPT-OSS 120B', icon: MODEL_ICONS.OPENAI, description: 'Open Source GPT', isImage: true },
     { id: 'MISTRAL', name: 'Mistral Small 3.1', icon: MODEL_ICONS.MISTRAL, description: '24B - Efficient', isImage: true },
     { id: 'STEPFUN', name: 'Step 3.5 Flash', icon: MODEL_ICONS.STEPFUN, description: 'Fast & Responsive', isImage: true },
-    { id: 'DESIGN', name: 'Create a Design', icon: '🎨', description: language === 'ar' ? 'إرسال طلب تصميم إلى Make.com' : 'Send design request to Make.com', isImage: false }
+    { id: 'DESIGN', name: 'Create a Design', icon: '🎨', description: language === 'ar' ? 'إنشاء تصميمات تلقائية وفق البروفايل' : 'Generate profile-based designs automatically', isImage: false }
   ];
 
   const currentModel = models.find(m => m.id === selectedModel);
