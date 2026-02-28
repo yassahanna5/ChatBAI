@@ -54,6 +54,7 @@ const OPENROUTER_MODELS = {
 const STABILITY_KEY = import.meta.env.VITE_STABILITY_KEY || '';
 const HF_TOKEN = import.meta.env.VITE_HF_TOKEN || '';
 const AIHORDE_KEY = import.meta.env.VITE_AIHORDE_KEY || '';
+const REPLICATE_API_TOKEN = import.meta.env.VITE_REPLICATE_API_TOKEN || '';
 
 // التحقق من وجود المفاتيح في بيئة التطوير
 if (import.meta.env.DEV) {
@@ -460,6 +461,63 @@ Generate high-quality visuals suitable for social media, banners, logos, and ad 
     throw new Error('AI Horde timeout');
   };
 
+  const pollReplicatePrediction = async (getUrl) => {
+    for (let i = 0; i < 25; i++) {
+      const res = await fetch(getUrl, {
+        headers: {
+          Authorization: `Bearer ${REPLICATE_API_TOKEN}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!res.ok) {
+        throw new Error(`Replicate polling failed (${res.status})`);
+      }
+
+      const data = await res.json();
+      if (data.status === 'succeeded') {
+        if (Array.isArray(data.output)) return data.output[0];
+        return data.output;
+      }
+
+      if (data.status === 'failed' || data.status === 'canceled') {
+        throw new Error(`Replicate generation ${data.status}`);
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 2500));
+    }
+
+    throw new Error('Replicate timeout');
+  };
+
+  const runReplicateModel = async (model, input) => {
+    const createUrl = `https://api.replicate.com/v1/models/${model}/predictions`;
+    const createRes = await fetch(createUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${REPLICATE_API_TOKEN}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ input })
+    });
+
+    if (!createRes.ok) {
+      throw new Error(`Replicate create failed (${createRes.status})`);
+    }
+
+    const prediction = await createRes.json();
+    if (prediction.status === 'succeeded') {
+      if (Array.isArray(prediction.output)) return prediction.output[0];
+      return prediction.output;
+    }
+
+    if (!prediction.urls?.get) {
+      throw new Error('Replicate prediction URL missing');
+    }
+
+    return pollReplicatePrediction(prediction.urls.get);
+  };
+
   const generateDesignsFromProviders = async (userPrompt) => {
     const prompt = buildDesignPrompt(userPrompt);
     const results = [];
@@ -554,6 +612,35 @@ Generate high-quality visuals suitable for social media, banners, logos, and ad 
       }
     }
 
+    if (REPLICATE_API_TOKEN) {
+      try {
+        const imagenUrl = await runReplicateModel('google/imagen-4', {
+          prompt,
+          aspect_ratio: '16:9',
+          safety_filter_level: 'block_medium_and_above'
+        });
+
+        if (imagenUrl) {
+          results.push({ name: 'Design 4', url: imagenUrl });
+        }
+      } catch (error) {
+        console.error('Replicate Imagen provider failed:', error);
+      }
+
+      try {
+        const fluxUrl = await runReplicateModel('black-forest-labs/flux-1.1-pro', {
+          prompt,
+          prompt_upsampling: true
+        });
+
+        if (fluxUrl) {
+          results.push({ name: 'Design 5', url: fluxUrl });
+        }
+      } catch (error) {
+        console.error('Replicate Flux provider failed:', error);
+      }
+    }
+
     return results;
   };
 
@@ -642,8 +729,8 @@ Respond in ${language === 'ar' ? 'Arabic' : 'English'} with detailed, profession
 
         if (!generatedDesigns.length) {
           throw new Error(language === 'ar'
-            ? 'تعذر إنشاء التصميمات. تأكد من إعداد مفاتيح البيئة (VITE_STABILITY_KEY / VITE_HF_TOKEN / VITE_AIHORDE_KEY).'
-            : 'Failed to generate designs. Please configure env keys (VITE_STABILITY_KEY / VITE_HF_TOKEN / VITE_AIHORDE_KEY).');
+            ? 'تعذر إنشاء التصميمات. تأكد من إعداد مفاتيح البيئة (VITE_STABILITY_KEY / VITE_HF_TOKEN / VITE_AIHORDE_KEY / VITE_REPLICATE_API_TOKEN).'
+            : 'Failed to generate designs. Please configure env keys (VITE_STABILITY_KEY / VITE_HF_TOKEN / VITE_AIHORDE_KEY / VITE_REPLICATE_API_TOKEN).');
         }
 
         const designsMarkdown = generatedDesigns
