@@ -1,11 +1,51 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Bot, User, Copy, Check } from 'lucide-react';
+import { Bot, User, Copy, Check, Download, FileText } from 'lucide-react';
 import { useState } from 'react';
+import jsPDF from 'jspdf';
 
 export default function MessageBubble({ message, userAvatar, userName }) {
   const [copied, setCopied] = useState(false);
   const isUser = message.role === 'user';
+
+  const createSafeFilename = (prefix, ext) => {
+    const ts = new Date().toISOString().replace(/[:.]/g, '-');
+    return `${prefix}-${ts}.${ext}`;
+  };
+
+  const downloadPdfReport = () => {
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const margin = 40;
+    const maxWidth = 515;
+    const lines = doc.splitTextToSize(message.content || '', maxWidth);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.text('ChatBAI Report', margin, margin);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(11);
+    doc.text(lines, margin, margin + 28);
+
+    doc.save(createSafeFilename('chatbai-report', 'pdf'));
+  };
+
+  const downloadDocReport = () => {
+    const reportHtml = `<!doctype html><html><head><meta charset="utf-8" /></head><body><pre style="white-space:pre-wrap;font-family:Arial,Helvetica,sans-serif;line-height:1.6;">${(message.content || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre></body></html>`;
+
+    const blob = new Blob([reportHtml], {
+      type: 'application/msword;charset=utf-8'
+    });
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = createSafeFilename('chatbai-report', 'doc');
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   const handleCopy = () => {
     navigator.clipboard.writeText(message.content);
@@ -71,12 +111,29 @@ export default function MessageBubble({ message, userAvatar, userName }) {
         </div>
         
         {!isUser && (
-          <button
-            onClick={handleCopy}
-            className="mt-1 opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-          >
-            {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-          </button>
+          <div className="mt-1 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+              onClick={handleCopy}
+              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+              title="Copy"
+            >
+              {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+            </button>
+            <button
+              onClick={downloadPdfReport}
+              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+              title="Download PDF"
+            >
+              <Download className="w-4 h-4" />
+            </button>
+            <button
+              onClick={downloadDocReport}
+              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+              title="Download DOC"
+            >
+              <FileText className="w-4 h-4" />
+            </button>
+          </div>
         )}
         
         <p className={`text-xs text-slate-400 mt-1 ${isUser ? 'text-right' : ''}`}>
