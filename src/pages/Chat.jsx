@@ -28,7 +28,11 @@ const MODEL_ICONS = {
   QWEN: 'https://openrouter.ai/images/icons/Qwen.png',
   OPENAI: 'https://openrouter.ai/images/icons/OpenAI.png',
   MISTRAL: 'https://openrouter.ai/images/icons/Mistral.png',
-  STEPFUN: 'https://upload.wikimedia.org/wikipedia/commons/6/6c/StepFun.png'
+  STEPFUN: 'https://upload.wikimedia.org/wikipedia/commons/6/6c/StepFun.png',
+  LLAMA: 'https://openrouter.ai/images/icons/Meta.png',
+  DEEPSEEK: 'https://openrouter.ai/images/icons/DeepSeek.png',
+  PHI: 'https://openrouter.ai/images/icons/Microsoft.png',
+  NOMIC: 'https://avatars.githubusercontent.com/u/125587308?s=200&v=4'
 };
 
 // ==================== مفاتيح API من متغيرات البيئة ====================
@@ -49,6 +53,17 @@ const OPENROUTER_MODELS = {
   OPENAI: 'openai/gpt-oss-120b',
   MISTRAL: 'mistralai/mistral-small-3.1-24b-instruct',
   STEPFUN: 'stepfun/step-3.5-flash'
+};
+
+const OLLAMA_CLOUD_API_KEY = import.meta.env.VITE_OLLAMA_CLOUD_API_KEY || '';
+const OLLAMA_CLOUD_API_URL = 'https://api.ollama.com/v1/chat/completions';
+const OLLAMA_MODELS = {
+  LLAMA32_CLOUD: 'llama3.2:latest',
+  DEEPSEEK_R1_CLOUD: 'deepseek-r1:latest',
+  QWEN25_CLOUD: 'qwen2.5:latest',
+  PHI4_CLOUD: 'phi4:latest',
+  MISTRAL_CLOUD: 'mistral:latest',
+  NOMIC_EMBED_CLOUD: 'nomic-embed-text:latest'
 };
 
 const BUSINESS_INTELLIGENCE_FRAMEWORK = `Core services you must cover:
@@ -84,6 +99,7 @@ if (import.meta.env.DEV) {
     MISTRAL: OPENROUTER_API_KEYS.MISTRAL ? '✅' : '❌',
     STEPFUN: OPENROUTER_API_KEYS.STEPFUN ? '✅' : '❌'
   });
+  console.log('☁️ Ollama Cloud API Key:', OLLAMA_CLOUD_API_KEY ? '✅' : '❌');
 }
 
 // ==================== دالة تحويل الملف إلى Base64 ====================
@@ -97,6 +113,7 @@ const fileToBase64 = (file) => {
       reject(error);
     };
   });
+  console.log('☁️ Ollama Cloud API Key:', OLLAMA_CLOUD_API_KEY ? '✅' : '❌');
 };
 
 // ==================== دالة رفع الملف إلى خادم مؤقت ====================
@@ -239,6 +256,10 @@ export default function Chat() {
 
   // ==================== دالة OpenRouter المتطورة ====================
   const invokeOpenRouter = async (model, prompt, files = []) => {
+    if (OLLAMA_MODELS[model]) {
+      return invokeOllamaCloud(model, prompt, files);
+    }
+
     const apiKey = OPENROUTER_API_KEYS[model];
     const modelName = OPENROUTER_MODELS[model];
 
@@ -320,6 +341,70 @@ ${BUSINESS_INTELLIGENCE_FRAMEWORK}`
       console.error(`❌ Error with ${model}:`, error);
       throw error;
     }
+  };
+
+  const invokeOllamaCloud = async (model, prompt, files = []) => {
+    const modelName = OLLAMA_MODELS[model];
+
+    if (!OLLAMA_CLOUD_API_KEY) {
+      return {
+        type: 'text',
+        content: language === 'ar'
+          ? `❌ مفتاح Ollama Cloud غير موجود للنموذج ${model}. الرجاء إضافة VITE_OLLAMA_CLOUD_API_KEY في ملف .env`
+          : `❌ Ollama Cloud API key not found for model ${model}. Please add VITE_OLLAMA_CLOUD_API_KEY in .env file`
+      };
+    }
+
+    const userContent = [{ type: 'text', text: prompt }];
+
+    for (const file of files) {
+      if (file.type.startsWith('image/')) {
+        userContent.push({ type: 'image_url', image_url: { url: file.url } });
+      } else {
+        userContent.push({
+          type: 'text',
+          text: `
+[Document: ${file.name} (${file.type}) - ${file.size} bytes]
+URL: ${file.url}
+Please analyze this document.`
+        });
+      }
+    }
+
+    const response = await fetch(OLLAMA_CLOUD_API_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${OLLAMA_CLOUD_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: modelName,
+        messages: [
+          {
+            role: 'system',
+            content: `You are an expert business AI consultant. Always answer in ${language === 'ar' ? 'Arabic' : 'English'}. ${BUSINESS_INTELLIGENCE_FRAMEWORK}`
+          },
+          { role: 'user', content: userContent }
+        ],
+        temperature: 0.2,
+        max_tokens: 1800,
+        stream: false
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Ollama API Error (${response.status}): ${errorText}`);
+    }
+
+    const data = await response.json();
+    const assistantMessage = data.choices?.[0]?.message;
+
+    if (Array.isArray(assistantMessage?.content)) {
+      return { type: 'multimodal', content: assistantMessage.content };
+    }
+
+    return { type: 'text', content: assistantMessage?.content || '' };
   };
 
   const handleOnboardingComplete = async () => {
@@ -939,7 +1024,13 @@ Respond in ${language === 'ar' ? 'Arabic' : 'English'} with detailed, profession
     { id: 'OPENAI', name: 'GPT-OSS 120B', icon: MODEL_ICONS.OPENAI, description: 'Open Source GPT', isImage: true },
     { id: 'MISTRAL', name: 'Mistral Small 3.1', icon: MODEL_ICONS.MISTRAL, description: '24B - Efficient', isImage: true },
     { id: 'STEPFUN', name: 'Step 3.5 Flash', icon: MODEL_ICONS.STEPFUN, description: 'Fast & Responsive', isImage: true },
-    { id: 'DESIGN', name: 'Create a Design', icon: '🎨', description: language === 'ar' ? 'إنشاء تصميمات تلقائية وفق البروفايل' : 'Generate profile-based designs automatically', isImage: false }
+    { id: 'DESIGN', name: 'Create a Design', icon: '🎨', description: language === 'ar' ? 'إنشاء تصميمات تلقائية وفق البروفايل' : 'Generate profile-based designs automatically', isImage: false },
+    { id: 'LLAMA32_CLOUD', name: 'llama3.2:latest (cloud)', icon: MODEL_ICONS.LLAMA, description: 'Ollama Cloud Llama 3.2', isImage: true },
+    { id: 'DEEPSEEK_R1_CLOUD', name: 'deepseek-r1:latest (cloud)', icon: MODEL_ICONS.DEEPSEEK, description: 'Ollama Cloud DeepSeek R1', isImage: true },
+    { id: 'QWEN25_CLOUD', name: 'qwen2.5:latest (cloud)', icon: MODEL_ICONS.QWEN, description: 'Ollama Cloud Qwen 2.5', isImage: true },
+    { id: 'PHI4_CLOUD', name: 'phi4:latest (cloud)', icon: MODEL_ICONS.PHI, description: 'Ollama Cloud Phi 4', isImage: true },
+    { id: 'MISTRAL_CLOUD', name: 'mistral:latest (cloud)', icon: MODEL_ICONS.MISTRAL, description: 'Ollama Cloud Mistral', isImage: true },
+    { id: 'NOMIC_EMBED_CLOUD', name: 'nomic-embed-text:latest (cloud)', icon: MODEL_ICONS.NOMIC, description: 'Ollama Cloud Nomic Embed Text', isImage: true }
   ];
 
   const currentModel = models.find(m => m.id === selectedModel);
