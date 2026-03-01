@@ -28,7 +28,11 @@ const MODEL_ICONS = {
   QWEN: 'https://openrouter.ai/images/icons/Qwen.png',
   OPENAI: 'https://openrouter.ai/images/icons/OpenAI.png',
   MISTRAL: 'https://openrouter.ai/images/icons/Mistral.png',
-  STEPFUN: 'https://upload.wikimedia.org/wikipedia/commons/6/6c/StepFun.png'
+  STEPFUN: 'https://upload.wikimedia.org/wikipedia/commons/6/6c/StepFun.png',
+  LLAMA: 'https://openrouter.ai/images/icons/Meta.png',
+  DEEPSEEK: 'https://openrouter.ai/images/icons/DeepSeek.png',
+  PHI: 'https://openrouter.ai/images/icons/Microsoft.png',
+  NOMIC: 'https://avatars.githubusercontent.com/u/125587308?s=200&v=4'
 };
 
 // ==================== نماذج الخلفية (Ollama Cloud عبر Backend) ====================
@@ -176,6 +180,11 @@ export default function Chat() {
       
       // جلب أحدث بيانات المستخدم من Firebase
       const freshUserData = await getUserByEmail(currentUser.email);
+      if (freshUserData) {
+        setUser(freshUserData);
+        const { password: _password, ...safeUser } = freshUserData;
+        sessionStorage.setItem('currentUser', JSON.stringify(safeUser));
+      }
       
       // جلب اشتراك المستخدم
       const userSub = await getUserSubscription(currentUser.email);
@@ -872,12 +881,12 @@ Respond in ${language === 'ar' ? 'Arabic' : 'English'} with detailed, profession
     { id: 'OPENAI', name: 'GPT-OSS 120B', icon: MODEL_ICONS.OPENAI, description: 'Open Source GPT', isImage: true },
     { id: 'MISTRAL', name: 'Mistral Small 3.1', icon: MODEL_ICONS.MISTRAL, description: '24B - Efficient', isImage: true },
     { id: 'STEPFUN', name: 'Step 3.5 Flash', icon: MODEL_ICONS.STEPFUN, description: 'Fast & Responsive', isImage: true },
-    { id: 'LLAMA32_CLOUD', name: 'llama3.2:latest (cloud)', icon: MODEL_ICONS.GEMMA, description: 'Ollama Cloud Llama 3.2', isImage: true },
-    { id: 'DEEPSEEK_R1_CLOUD', name: 'deepseek-r1:latest (cloud)', icon: MODEL_ICONS.QWEN, description: 'Ollama Cloud DeepSeek R1', isImage: true },
+    { id: 'LLAMA32_CLOUD', name: 'llama3.2:latest (cloud)', icon: MODEL_ICONS.LLAMA, description: 'Ollama Cloud Llama 3.2', isImage: true },
+    { id: 'DEEPSEEK_R1_CLOUD', name: 'deepseek-r1:latest (cloud)', icon: MODEL_ICONS.DEEPSEEK, description: 'Ollama Cloud DeepSeek R1', isImage: true },
     { id: 'QWEN25_CLOUD', name: 'qwen2.5:latest (cloud)', icon: MODEL_ICONS.QWEN, description: 'Ollama Cloud Qwen 2.5', isImage: true },
-    { id: 'PHI4_CLOUD', name: 'phi4:latest (cloud)', icon: MODEL_ICONS.OPENAI, description: 'Ollama Cloud Phi 4', isImage: true },
+    { id: 'PHI4_CLOUD', name: 'phi4:latest (cloud)', icon: MODEL_ICONS.PHI, description: 'Ollama Cloud Phi 4', isImage: true },
     { id: 'MISTRAL_CLOUD', name: 'mistral:latest (cloud)', icon: MODEL_ICONS.MISTRAL, description: 'Ollama Cloud Mistral', isImage: true },
-    { id: 'NOMIC_EMBED_CLOUD', name: 'nomic-embed-text:latest (cloud)', icon: MODEL_ICONS.STEPFUN, description: 'Ollama Cloud Nomic Embed Text', isImage: true },
+    { id: 'NOMIC_EMBED_CLOUD', name: 'nomic-embed-text:latest (cloud)', icon: MODEL_ICONS.NOMIC, description: 'Ollama Cloud Nomic Embed Text', isImage: true },
     { id: 'DESIGN', name: 'Create a Design', icon: '🎨', description: language === 'ar' ? 'إنشاء تصميمات تلقائية وفق البروفايل' : 'Generate profile-based designs automatically', isImage: false }
   ];
 
@@ -1136,7 +1145,7 @@ Respond in ${language === 'ar' ? 'Arabic' : 'English'} with detailed, profession
                       exit={{ opacity: 0, y: 10 }}
                       className="absolute bottom-full mb-2 w-72 bg-white dark:bg-slate-800 rounded-xl shadow-2xl border overflow-hidden z-50"
                     >
-                      <div className="p-2">
+                      <div className="p-2 max-h-80 overflow-y-auto">
                         {models.map((model) => (
                           <button
                             key={model.id}

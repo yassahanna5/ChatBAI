@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { MessageSquarePlus, History, Settings, User, Bell, CreditCard, LogOut, Moon, Sun, Languages, Shield, X, Edit2, Save, Camera, Loader2 } from 'lucide-react';
@@ -47,7 +47,9 @@ export default function ChatSidebar({
     target_audience: user?.target_audience || '',
     current_challenges: user?.current_challenges || '',
     goals: user?.goals || '',
-    competitors: user?.competitors || ''
+    competitors: user?.competitors || '',
+    business_type: user?.business_type || '',
+    social_platforms: user?.social_platforms || ''
   });
 
   const handleProfileUpdate = async () => {
@@ -56,6 +58,34 @@ export default function ChatSidebar({
       setEditingProfile(false);
       setShowProfileModal(false);
     }
+  };
+
+  useEffect(() => {
+    setProfileForm({
+      full_name: user?.full_name || '',
+      phone: user?.phone || '',
+      birth_date: user?.birth_date || '',
+      avatar_url: user?.avatar_url || '',
+      business_name: user?.business_name || '',
+      country: user?.country || '',
+      city: user?.city || '',
+      gender: user?.gender || '',
+      industry: user?.industry || '',
+      company_size: user?.company_size || '',
+      website: user?.website || '',
+      monthly_budget: user?.monthly_budget || '',
+      target_audience: user?.target_audience || '',
+      current_challenges: user?.current_challenges || '',
+      goals: user?.goals || '',
+      competitors: user?.competitors || '',
+      business_type: user?.business_type || '',
+      social_platforms: user?.social_platforms || ''
+    });
+  }, [user]);
+
+  const handleLogout = () => {
+    sessionStorage.removeItem('currentUser');
+    onNavigate('SignIn');
   };
 
   const handleImageUpload = async (e) => {
@@ -244,6 +274,14 @@ export default function ChatSidebar({
               {t('adminPanel')}
             </Link>
           )}
+
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+            {language === 'ar' ? 'تسجيل الخروج' : 'Logout'}
+          </button>
           
           <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-200 dark:border-slate-700">
             <button
@@ -531,6 +569,14 @@ export default function ChatSidebar({
                 </div>
 
                 <div className="space-y-2">
+                  <Label>{language === 'ar' ? 'نوع النشاط' : 'Business Type'}</Label>
+                  <Input
+                    value={profileForm.business_type}
+                    onChange={(e) => setProfileForm({ ...profileForm, business_type: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
                   <Label>{language === 'ar' ? 'المجال' : 'Industry'}</Label>
                   <Input
                     value={profileForm.industry}
@@ -605,6 +651,14 @@ export default function ChatSidebar({
               </div>
 
               <div className="space-y-2">
+                <Label>{language === 'ar' ? 'منصات التواصل' : 'Social Platforms'}</Label>
+                <Input
+                  value={profileForm.social_platforms}
+                  onChange={(e) => setProfileForm({ ...profileForm, social_platforms: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
                 <Label>{language === 'ar' ? 'المنافسون' : 'Competitors'}</Label>
                 <Input
                   value={profileForm.competitors}
@@ -648,7 +702,9 @@ export default function ChatSidebar({
                       target_audience: user?.target_audience || '',
                       current_challenges: user?.current_challenges || '',
                       goals: user?.goals || '',
-                      competitors: user?.competitors || ''
+                      competitors: user?.competitors || '',
+                      business_type: user?.business_type || '',
+                      social_platforms: user?.social_platforms || ''
                     });
                   }}
                   className="bg-[#1995AD] hover:bg-[#1995AD]/90"
