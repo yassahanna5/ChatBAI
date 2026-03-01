@@ -32,14 +32,20 @@ const MODEL_ICONS = {
 };
 
 // ==================== نماذج الخلفية (Ollama Cloud عبر Backend) ====================
-const BACKEND_ANALYZE_URL = import.meta.env.VITE_BACKEND_ANALYZE_URL || 'http://localhost:3000/analyze';
+const BACKEND_ANALYZE_URL = import.meta.env.VITE_BACKEND_ANALYZE_URL || 'https://api.chatbai.business/analyze';
 const BACKEND_MODEL_MAP = {
   GEMMA: 'llama3.2:latest',
   GEMMA2: 'deepseek-r1:latest',
   QWEN: 'qwen2.5:latest',
   OPENAI: 'phi4:latest',
   MISTRAL: 'mistral:latest',
-  STEPFUN: 'llama3.2:latest'
+  STEPFUN: 'llama3.2:latest',
+  LLAMA32_CLOUD: 'llama3.2:latest',
+  DEEPSEEK_R1_CLOUD: 'deepseek-r1:latest',
+  QWEN25_CLOUD: 'qwen2.5:latest',
+  PHI4_CLOUD: 'phi4:latest',
+  MISTRAL_CLOUD: 'mistral:latest',
+  NOMIC_EMBED_CLOUD: 'nomic-embed-text:latest'
 };
 
 const BUSINESS_INTELLIGENCE_FRAMEWORK = `Core services you must cover:
@@ -866,6 +872,12 @@ Respond in ${language === 'ar' ? 'Arabic' : 'English'} with detailed, profession
     { id: 'OPENAI', name: 'GPT-OSS 120B', icon: MODEL_ICONS.OPENAI, description: 'Open Source GPT', isImage: true },
     { id: 'MISTRAL', name: 'Mistral Small 3.1', icon: MODEL_ICONS.MISTRAL, description: '24B - Efficient', isImage: true },
     { id: 'STEPFUN', name: 'Step 3.5 Flash', icon: MODEL_ICONS.STEPFUN, description: 'Fast & Responsive', isImage: true },
+    { id: 'LLAMA32_CLOUD', name: 'llama3.2:latest (cloud)', icon: MODEL_ICONS.GEMMA, description: 'Ollama Cloud Llama 3.2', isImage: true },
+    { id: 'DEEPSEEK_R1_CLOUD', name: 'deepseek-r1:latest (cloud)', icon: MODEL_ICONS.QWEN, description: 'Ollama Cloud DeepSeek R1', isImage: true },
+    { id: 'QWEN25_CLOUD', name: 'qwen2.5:latest (cloud)', icon: MODEL_ICONS.QWEN, description: 'Ollama Cloud Qwen 2.5', isImage: true },
+    { id: 'PHI4_CLOUD', name: 'phi4:latest (cloud)', icon: MODEL_ICONS.OPENAI, description: 'Ollama Cloud Phi 4', isImage: true },
+    { id: 'MISTRAL_CLOUD', name: 'mistral:latest (cloud)', icon: MODEL_ICONS.MISTRAL, description: 'Ollama Cloud Mistral', isImage: true },
+    { id: 'NOMIC_EMBED_CLOUD', name: 'nomic-embed-text:latest (cloud)', icon: MODEL_ICONS.STEPFUN, description: 'Ollama Cloud Nomic Embed Text', isImage: true },
     { id: 'DESIGN', name: 'Create a Design', icon: '🎨', description: language === 'ar' ? 'إنشاء تصميمات تلقائية وفق البروفايل' : 'Generate profile-based designs automatically', isImage: false }
   ];
 
