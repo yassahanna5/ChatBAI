@@ -28,11 +28,7 @@ const MODEL_ICONS = {
   QWEN: 'https://openrouter.ai/images/icons/Qwen.png',
   OPENAI: 'https://openrouter.ai/images/icons/OpenAI.png',
   MISTRAL: 'https://openrouter.ai/images/icons/Mistral.png',
-  STEPFUN: 'https://upload.wikimedia.org/wikipedia/commons/6/6c/StepFun.png',
-  LLAMA: 'https://openrouter.ai/images/icons/Meta.png',
-  DEEPSEEK: 'https://openrouter.ai/images/icons/DeepSeek.png',
-  PHI: 'https://openrouter.ai/images/icons/Microsoft.png',
-  NOMIC: 'https://avatars.githubusercontent.com/u/125587308?s=200&v=4'
+  STEPFUN: 'https://upload.wikimedia.org/wikipedia/commons/6/6c/StepFun.png'
 };
 
 // ==================== مفاتيح API من متغيرات البيئة ====================
@@ -53,23 +49,6 @@ const OPENROUTER_MODELS = {
   OPENAI: 'openai/gpt-oss-120b',
   MISTRAL: 'mistralai/mistral-small-3.1-24b-instruct',
   STEPFUN: 'stepfun/step-3.5-flash'
-};
-
-// ==================== نماذج الخلفية (Ollama Cloud عبر Backend) ====================
-const BACKEND_ANALYZE_URL = import.meta.env.VITE_BACKEND_ANALYZE_URL || 'https://api.chatbai.business/analyze';
-const BACKEND_MODEL_MAP = {
-  GEMMA: 'llama3.2:latest',
-  GEMMA2: 'deepseek-r1:latest',
-  QWEN: 'qwen2.5:latest',
-  OPENAI: 'phi4:latest',
-  MISTRAL: 'mistral:latest',
-  STEPFUN: 'llama3.2:latest',
-  LLAMA32_CLOUD: 'llama3.2:latest',
-  DEEPSEEK_R1_CLOUD: 'deepseek-r1:latest',
-  QWEN25_CLOUD: 'qwen2.5:latest',
-  PHI4_CLOUD: 'phi4:latest',
-  MISTRAL_CLOUD: 'mistral:latest',
-  NOMIC_EMBED_CLOUD: 'nomic-embed-text:latest'
 };
 
 const BUSINESS_INTELLIGENCE_FRAMEWORK = `Core services you must cover:
@@ -105,7 +84,6 @@ if (import.meta.env.DEV) {
     MISTRAL: OPENROUTER_API_KEYS.MISTRAL ? '✅' : '❌',
     STEPFUN: OPENROUTER_API_KEYS.STEPFUN ? '✅' : '❌'
   });
-  console.log('Backend analyze URL:', BACKEND_ANALYZE_URL);
 }
 
 // ==================== دالة تحويل الملف إلى Base64 ====================
@@ -259,37 +237,89 @@ export default function Chat() {
     }
   };
 
-  // ==================== دالة استدعاء Backend للتحليل ====================
+  // ==================== دالة OpenRouter المتطورة ====================
   const invokeOpenRouter = async (model, prompt, files = []) => {
-    const modelName = BACKEND_MODEL_MAP[model] || 'llama3.2:latest';
+    const apiKey = OPENROUTER_API_KEYS[model];
+    const modelName = OPENROUTER_MODELS[model];
 
-    const attachedFilesText = files.length
-      ? `\nAttached files for context:\n${files.map(f => `- ${f.name} (${f.type}, ${f.size} bytes): ${f.url}`).join('\n')}`
-      : '';
-
-    const response = await fetch(BACKEND_ANALYZE_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: modelName,
-        type: 'business',
-        temperature: 0.2,
-        max_tokens: 1800,
-        language,
-        prompt: `${prompt}${attachedFilesText}`
-      })
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Backend error (${response.status}): ${errorText}`);
+    if (!apiKey) {
+      console.error(`❌ No API key found for model: ${model}`);
+      return {
+        type: 'text',
+        content: language === 'ar'
+          ? `❌ مفتاح API غير موجود للنموذج ${model}. الرجاء إضافة المفتاح في ملف .env`
+          : `❌ API key not found for model ${model}. Please add the key in .env file`
+      };
     }
 
-    const data = await response.json();
-    return {
-      type: 'text',
-      content: data.content || (language === 'ar' ? 'تعذر الحصول على استجابة.' : 'No response content returned.')
-    };
+    const userContent = [{ type: 'text', text: prompt }];
+
+    for (const file of files) {
+      if (file.type.startsWith('image/')) {
+        userContent.push({
+          type: 'image_url',
+          image_url: { url: file.url }
+        });
+      } else {
+        userContent.push({
+          type: 'text',
+          text: `
+[Document: ${file.name} (${file.type}) - ${file.size} bytes]
+URL: ${file.url}
+Please analyze this document.`
+        });
+      }
+    }
+
+    const messages = [
+      {
+        role: 'system',
+        content: `You are an expert business AI consultant.
+Only answer within the user's business profile context.
+If user asks anything unrelated to their profile/business context, refuse politely and ask them to update profile or ask business-specific questions.
+Always respond in ${language === 'ar' ? 'Arabic' : 'English'}.
+${BUSINESS_INTELLIGENCE_FRAMEWORK}`
+      },
+      {
+        role: 'user',
+        content: userContent
+      }
+    ];
+
+    try {
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': window.location.origin,
+          'X-Title': 'ChatBAI'
+        },
+        body: JSON.stringify({
+          model: modelName,
+          messages,
+          temperature: 0.2,
+          max_tokens: 1800
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`API Error (${response.status}): ${errorText}`);
+      }
+
+      const data = await response.json();
+      const assistantMessage = data.choices[0].message;
+
+      if (Array.isArray(assistantMessage.content)) {
+        return { type: 'multimodal', content: assistantMessage.content };
+      }
+
+      return { type: 'text', content: assistantMessage.content };
+    } catch (error) {
+      console.error(`❌ Error with ${model}:`, error);
+      throw error;
+    }
   };
 
   const handleOnboardingComplete = async () => {
@@ -909,12 +939,6 @@ Respond in ${language === 'ar' ? 'Arabic' : 'English'} with detailed, profession
     { id: 'OPENAI', name: 'GPT-OSS 120B', icon: MODEL_ICONS.OPENAI, description: 'Open Source GPT', isImage: true },
     { id: 'MISTRAL', name: 'Mistral Small 3.1', icon: MODEL_ICONS.MISTRAL, description: '24B - Efficient', isImage: true },
     { id: 'STEPFUN', name: 'Step 3.5 Flash', icon: MODEL_ICONS.STEPFUN, description: 'Fast & Responsive', isImage: true },
-    { id: 'LLAMA32_CLOUD', name: 'llama3.2:latest (cloud)', icon: MODEL_ICONS.LLAMA, description: 'Ollama Cloud Llama 3.2', isImage: true },
-    { id: 'DEEPSEEK_R1_CLOUD', name: 'deepseek-r1:latest (cloud)', icon: MODEL_ICONS.DEEPSEEK, description: 'Ollama Cloud DeepSeek R1', isImage: true },
-    { id: 'QWEN25_CLOUD', name: 'qwen2.5:latest (cloud)', icon: MODEL_ICONS.QWEN, description: 'Ollama Cloud Qwen 2.5', isImage: true },
-    { id: 'PHI4_CLOUD', name: 'phi4:latest (cloud)', icon: MODEL_ICONS.PHI, description: 'Ollama Cloud Phi 4', isImage: true },
-    { id: 'MISTRAL_CLOUD', name: 'mistral:latest (cloud)', icon: MODEL_ICONS.MISTRAL, description: 'Ollama Cloud Mistral', isImage: true },
-    { id: 'NOMIC_EMBED_CLOUD', name: 'nomic-embed-text:latest (cloud)', icon: MODEL_ICONS.NOMIC, description: 'Ollama Cloud Nomic Embed Text', isImage: true },
     { id: 'DESIGN', name: 'Create a Design', icon: '🎨', description: language === 'ar' ? 'إنشاء تصميمات تلقائية وفق البروفايل' : 'Generate profile-based designs automatically', isImage: false }
   ];
 
