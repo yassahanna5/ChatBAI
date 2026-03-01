@@ -35,6 +35,26 @@ const MODEL_ICONS = {
   NOMIC: 'https://avatars.githubusercontent.com/u/125587308?s=200&v=4'
 };
 
+// ==================== مفاتيح API من متغيرات البيئة ====================
+const OPENROUTER_API_KEYS = {
+  GEMMA: import.meta.env.VITE_OPENROUTER_API_KEY_GEMMA || '',
+  GEMMA2: import.meta.env.VITE_OPENROUTER_API_KEY_GEMMA2 || '',
+  QWEN: import.meta.env.VITE_OPENROUTER_API_KEY_QWEN || '',
+  OPENAI: import.meta.env.VITE_OPENROUTER_API_KEY_OPENAI || '',
+  MISTRAL: import.meta.env.VITE_OPENROUTER_API_KEY_MISTRAL || '',
+  STEPFUN: import.meta.env.VITE_OPENROUTER_API_KEY_STEPFUN || ''
+};
+
+// ==================== أسماء الموديلات ====================
+const OPENROUTER_MODELS = {
+  GEMMA: 'google/gemma-3-27b-it',
+  GEMMA2: 'google/gemma-3-27b-it',
+  QWEN: 'qwen/qwen3-coder-480b',
+  OPENAI: 'openai/gpt-oss-120b',
+  MISTRAL: 'mistralai/mistral-small-3.1-24b-instruct',
+  STEPFUN: 'stepfun/step-3.5-flash'
+};
+
 // ==================== نماذج الخلفية (Ollama Cloud عبر Backend) ====================
 const BACKEND_ANALYZE_URL = import.meta.env.VITE_BACKEND_ANALYZE_URL || 'https://api.chatbai.business/analyze';
 const BACKEND_MODEL_MAP = {
@@ -77,6 +97,14 @@ const REPLICATE_API_TOKEN = import.meta.env.VITE_REPLICATE_API_TOKEN || '';
 
 // التحقق من وجود المفاتيح في بيئة التطوير
 if (import.meta.env.DEV) {
+  console.log('🔑 OpenRouter API Keys Status:', {
+    GEMMA: OPENROUTER_API_KEYS.GEMMA ? '✅' : '❌',
+    GEMMA2: OPENROUTER_API_KEYS.GEMMA2 ? '✅' : '❌',
+    QWEN: OPENROUTER_API_KEYS.QWEN ? '✅' : '❌',
+    OPENAI: OPENROUTER_API_KEYS.OPENAI ? '✅' : '❌',
+    MISTRAL: OPENROUTER_API_KEYS.MISTRAL ? '✅' : '❌',
+    STEPFUN: OPENROUTER_API_KEYS.STEPFUN ? '✅' : '❌'
+  });
   console.log('Backend analyze URL:', BACKEND_ANALYZE_URL);
 }
 
