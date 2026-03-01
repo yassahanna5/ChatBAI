@@ -31,24 +31,15 @@ const MODEL_ICONS = {
   STEPFUN: 'https://upload.wikimedia.org/wikipedia/commons/6/6c/StepFun.png'
 };
 
-// ==================== مفاتيح API من متغيرات البيئة ====================
-const OPENROUTER_API_KEYS = {
-  GEMMA: import.meta.env.VITE_OPENROUTER_API_KEY_GEMMA || '',
-  GEMMA2: import.meta.env.VITE_OPENROUTER_API_KEY_GEMMA2 || '',
-  QWEN: import.meta.env.VITE_OPENROUTER_API_KEY_QWEN || '',
-  OPENAI: import.meta.env.VITE_OPENROUTER_API_KEY_OPENAI || '',
-  MISTRAL: import.meta.env.VITE_OPENROUTER_API_KEY_MISTRAL || '',
-  STEPFUN: import.meta.env.VITE_OPENROUTER_API_KEY_STEPFUN || ''
-};
-
-// ==================== أسماء الموديلات ====================
-const OPENROUTER_MODELS = {
-  GEMMA: 'google/gemma-3-27b-it',
-  GEMMA2: 'google/gemma-3-27b-it',
-  QWEN: 'qwen/qwen3-coder-480b',
-  OPENAI: 'openai/gpt-oss-120b',
-  MISTRAL: 'mistralai/mistral-small-3.1-24b-instruct',
-  STEPFUN: 'stepfun/step-3.5-flash'
+// ==================== نماذج الخلفية (Ollama Cloud عبر Backend) ====================
+const BACKEND_ANALYZE_URL = import.meta.env.VITE_BACKEND_ANALYZE_URL || 'http://localhost:3000/analyze';
+const BACKEND_MODEL_MAP = {
+  GEMMA: 'llama3.2:latest',
+  GEMMA2: 'deepseek-r1:latest',
+  QWEN: 'qwen2.5:latest',
+  OPENAI: 'phi4:latest',
+  MISTRAL: 'mistral:latest',
+  STEPFUN: 'llama3.2:latest'
 };
 
 const BUSINESS_INTELLIGENCE_FRAMEWORK = `Core services you must cover:
@@ -76,14 +67,7 @@ const REPLICATE_API_TOKEN = import.meta.env.VITE_REPLICATE_API_TOKEN || '';
 
 // التحقق من وجود المفاتيح في بيئة التطوير
 if (import.meta.env.DEV) {
-  console.log('🔑 OpenRouter API Keys Status:', {
-    GEMMA: OPENROUTER_API_KEYS.GEMMA ? '✅' : '❌',
-    GEMMA2: OPENROUTER_API_KEYS.GEMMA2 ? '✅' : '❌',
-    QWEN: OPENROUTER_API_KEYS.QWEN ? '✅' : '❌',
-    OPENAI: OPENROUTER_API_KEYS.OPENAI ? '✅' : '❌',
-    MISTRAL: OPENROUTER_API_KEYS.MISTRAL ? '✅' : '❌',
-    STEPFUN: OPENROUTER_API_KEYS.STEPFUN ? '✅' : '❌'
-  });
+  console.log('Backend analyze URL:', BACKEND_ANALYZE_URL);
 }
 
 // ==================== دالة تحويل الملف إلى Base64 ====================
@@ -232,105 +216,37 @@ export default function Chat() {
     }
   };
 
-  // ==================== دالة OpenRouter المتطورة ====================
+  // ==================== دالة استدعاء Backend للتحليل ====================
   const invokeOpenRouter = async (model, prompt, files = []) => {
-    const apiKey = OPENROUTER_API_KEYS[model];
-    const modelName = OPENROUTER_MODELS[model];
-    
-    // التحقق من وجود المفتاح
-    if (!apiKey) {
-      console.error(`❌ No API key found for model: ${model}`);
-      return {
-        type: 'text',
-        content: language === 'ar' 
-          ? `❌ مفتاح API غير موجود للنموذج ${model}. الرجاء إضافة المفتاح في ملف .env`
-          : `❌ API key not found for model ${model}. Please add the key in .env file`
-      };
-    }
-    
-    const userContent = [];
-    
-    userContent.push({
-      type: 'text',
-      text: prompt
+    const modelName = BACKEND_MODEL_MAP[model] || 'llama3.2:latest';
+
+    const attachedFilesText = files.length
+      ? `\nAttached files for context:\n${files.map(f => `- ${f.name} (${f.type}, ${f.size} bytes): ${f.url}`).join('\n')}`
+      : '';
+
+    const response = await fetch(BACKEND_ANALYZE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: modelName,
+        type: 'business',
+        temperature: 0.2,
+        max_tokens: 1800,
+        language,
+        prompt: `${prompt}${attachedFilesText}`
+      })
     });
 
-    for (const file of files) {
-      if (file.type.startsWith('image/')) {
-        userContent.push({
-          type: 'image_url',
-          image_url: {
-            url: file.url
-          }
-        });
-      } else {
-        userContent.push({
-          type: 'text',
-          text: `\n[Document: ${file.name} (${file.type}) - ${file.size} bytes]\nURL: ${file.url}\nPlease analyze this document.`
-        });
-      }
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Backend error (${response.status}): ${errorText}`);
     }
 
-    const messages = [
-      {
-        role: 'system',
-        content: `You are an expert business AI consultant.
-Only answer within the user's business profile context.
-If user asks anything unrelated to their profile/business context, refuse politely and ask them to update profile or ask business-specific questions.
-Always respond in ${language === 'ar' ? 'Arabic' : 'English'}.
-${BUSINESS_INTELLIGENCE_FRAMEWORK}`
-      },
-      {
-        role: 'user',
-        content: userContent
-      }
-    ];
-
-    try {
-      console.log(`📤 Sending to ${modelName} with ${files.length} files`);
-      
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-          'HTTP-Referer': window.location.origin,
-          'X-Title': 'ChatBAI'
-        },
-        body: JSON.stringify({
-          model: modelName,
-          messages: messages,
-          temperature: 0.2,
-          max_tokens: 1800
-        })
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`API Error (${response.status}): ${errorText}`);
-      }
-
-      const data = await response.json();
-      console.log('✅ Response received');
-      
-      const assistantMessage = data.choices[0].message;
-      
-      if (Array.isArray(assistantMessage.content)) {
-        return {
-          type: 'multimodal',
-          content: assistantMessage.content
-        };
-      }
-      
-      return {
-        type: 'text',
-        content: assistantMessage.content
-      };
-      
-    } catch (error) {
-      console.error(`❌ Error with ${model}:`, error);
-      throw error;
-    }
+    const data = await response.json();
+    return {
+      type: 'text',
+      content: data.content || (language === 'ar' ? 'تعذر الحصول على استجابة.' : 'No response content returned.')
+    };
   };
 
   const handleOnboardingComplete = async () => {
