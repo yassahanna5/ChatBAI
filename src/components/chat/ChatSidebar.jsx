@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { MessageSquarePlus, History, Settings, User, Bell, CreditCard, LogOut, Moon, Sun, Languages, Shield, X, Edit2, Save, Camera, Loader2 } from 'lucide-react';
@@ -37,6 +37,7 @@ export default function ChatSidebar({
     birth_date: user?.birth_date || '',
     avatar_url: user?.avatar_url || '',
     business_name: user?.business_name || '',
+    business_type: user?.business_type || '',
     country: user?.country || '',
     city: user?.city || '',
     gender: user?.gender || '',
@@ -47,8 +48,32 @@ export default function ChatSidebar({
     target_audience: user?.target_audience || '',
     current_challenges: user?.current_challenges || '',
     goals: user?.goals || '',
-    competitors: user?.competitors || ''
+    competitors: user?.competitors || '',
+    social_platforms: user?.social_platforms || ''
   });
+
+  useEffect(() => {
+    setProfileForm({
+      full_name: user?.full_name || '',
+      phone: user?.phone || '',
+      birth_date: user?.birth_date || '',
+      avatar_url: user?.avatar_url || '',
+      business_name: user?.business_name || '',
+      business_type: user?.business_type || '',
+      country: user?.country || '',
+      city: user?.city || '',
+      gender: user?.gender || '',
+      industry: user?.industry || '',
+      company_size: user?.company_size || '',
+      website: user?.website || '',
+      monthly_budget: user?.monthly_budget || '',
+      target_audience: user?.target_audience || '',
+      current_challenges: user?.current_challenges || '',
+      goals: user?.goals || '',
+      competitors: user?.competitors || '',
+      social_platforms: user?.social_platforms || ''
+    });
+  }, [user]);
 
   const handleProfileUpdate = async () => {
     const success = await onUpdateProfile(profileForm);
@@ -531,6 +556,14 @@ export default function ChatSidebar({
                 </div>
 
                 <div className="space-y-2">
+                  <Label>{language === 'ar' ? 'نوع النشاط' : 'Business Type'}</Label>
+                  <Input
+                    value={profileForm.business_type}
+                    onChange={(e) => setProfileForm({ ...profileForm, business_type: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
                   <Label>{language === 'ar' ? 'المجال' : 'Industry'}</Label>
                   <Input
                     value={profileForm.industry}
@@ -613,6 +646,15 @@ export default function ChatSidebar({
               </div>
 
               <div className="space-y-2">
+                <Label>{language === 'ar' ? 'منصات التواصل الاجتماعي' : 'Social Media'}</Label>
+                <Input
+                  value={profileForm.social_platforms}
+                  onChange={(e) => setProfileForm({ ...profileForm, social_platforms: e.target.value })}
+                  placeholder={language === 'ar' ? 'مثال: Instagram, LinkedIn' : 'e.g. Instagram, LinkedIn'}
+                />
+              </div>
+
+              <div className="space-y-2">
                 <Label>{language === 'ar' ? 'الميزانية الشهرية' : 'Monthly Budget'}</Label>
                 <Input
                   value={profileForm.monthly_budget}
@@ -638,6 +680,7 @@ export default function ChatSidebar({
                       birth_date: user?.birth_date || '',
                       avatar_url: user?.avatar_url || '',
                       business_name: user?.business_name || '',
+                      business_type: user?.business_type || '',
                       country: user?.country || '',
                       city: user?.city || '',
                       gender: user?.gender || '',
@@ -648,7 +691,8 @@ export default function ChatSidebar({
                       target_audience: user?.target_audience || '',
                       current_challenges: user?.current_challenges || '',
                       goals: user?.goals || '',
-                      competitors: user?.competitors || ''
+                      competitors: user?.competitors || '',
+                      social_platforms: user?.social_platforms || ''
                     });
                   }}
                   className="bg-[#1995AD] hover:bg-[#1995AD]/90"
