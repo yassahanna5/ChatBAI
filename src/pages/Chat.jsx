@@ -371,40 +371,56 @@ Please analyze this document.`
       }
     }
 
-    const response = await fetch(OLLAMA_CLOUD_API_URL, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${OLLAMA_CLOUD_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: modelName,
-        messages: [
-          {
-            role: 'system',
-            content: `You are an expert business AI consultant. Always answer in ${language === 'ar' ? 'Arabic' : 'English'}. ${BUSINESS_INTELLIGENCE_FRAMEWORK}`
-          },
-          { role: 'user', content: userContent }
-        ],
-        temperature: 0.2,
-        max_tokens: 1800,
-        stream: false
-      })
-    });
+    try {
+      const baseUrl = window.location.origin;
+      const response = await fetch(`${baseUrl}/api/ollama-proxy`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: modelName,
+          messages: [
+            {
+              role: 'system',
+              content: `You are an expert business AI consultant. Always answer in ${language === 'ar' ? 'Arabic' : 'English'}. ${BUSINESS_INTELLIGENCE_FRAMEWORK}`
+            },
+            { role: 'user', content: userContent }
+          ],
+          temperature: 0.2,
+          max_tokens: 1800
+        })
+      });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Ollama API Error (${response.status}): ${errorText}`);
+      if (!response.ok) {
+        let errorMessage = `HTTP error ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch {
+          const errorText = await response.text();
+          if (errorText) errorMessage = errorText;
+        }
+        throw new Error(errorMessage);
+      }
+
+      const data = await response.json();
+      const assistantMessage = data.choices?.[0]?.message;
+
+      if (Array.isArray(assistantMessage?.content)) {
+        return { type: 'multimodal', content: assistantMessage.content };
+      }
+
+      return { type: 'text', content: assistantMessage?.content || '' };
+    } catch (error) {
+      console.error('❌ Ollama Cloud error:', error);
+      return {
+        type: 'text',
+        content: language === 'ar'
+          ? `❌ خطأ في الاتصال بـ Ollama Cloud: ${error.message}`
+          : `❌ Error connecting to Ollama Cloud: ${error.message}`
+      };
     }
-
-    const data = await response.json();
-    const assistantMessage = data.choices?.[0]?.message;
-
-    if (Array.isArray(assistantMessage?.content)) {
-      return { type: 'multimodal', content: assistantMessage.content };
-    }
-
-    return { type: 'text', content: assistantMessage?.content || '' };
   };
 
   const handleOnboardingComplete = async () => {
