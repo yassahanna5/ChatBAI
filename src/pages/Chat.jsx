@@ -576,16 +576,12 @@ Generate high-quality visuals suitable for social media, banners, logos, and ad 
         `${idx + 1}. ${item.title || 'Untitled'}
 URL: ${item.url || 'N/A'}
 Summary: ${item.content || 'N/A'}`
-      )).join('
-
-');
+      )).join('\n\n');
 
       const pagesText = (data.pages || []).slice(0, 5).map((item, idx) => (
         `${idx + 1}. URL: ${item.url}
 Extracted content: ${(item.content || '').slice(0, 1000)}`
-      )).join('
-
-');
+      )).join('\n\n');
 
       if (!sourcesText && !pagesText) return '';
 
