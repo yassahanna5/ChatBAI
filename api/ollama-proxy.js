@@ -12,7 +12,7 @@ export default async function handler(req, res) {
 
   try {
     const { model, messages, temperature = 0.2, max_tokens = 1800 } = req.body || {};
-    const OLLAMA_CLOUD_API_KEY = process.env.VITE_OLLAMA_CLOUD_API_KEY;
+    const OLLAMA_CLOUD_API_KEY = process.env.OLLAMA_CLOUD_API_KEY || process.env.VITE_OLLAMA_CLOUD_API_KEY;
 
     if (!OLLAMA_CLOUD_API_KEY) {
       return res.status(500).json({ error: 'Ollama API key not configured' });

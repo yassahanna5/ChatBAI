@@ -55,7 +55,6 @@ const OPENROUTER_MODELS = {
   STEPFUN: 'stepfun/step-3.5-flash'
 };
 
-const OLLAMA_CLOUD_API_KEY = import.meta.env.VITE_OLLAMA_CLOUD_API_KEY || '';
 const OLLAMA_CLOUD_API_URL = 'https://api.ollama.com/v1/chat/completions';
 const OLLAMA_MODELS = {
   LLAMA32_CLOUD: 'llama3.2:latest',
@@ -99,7 +98,6 @@ if (import.meta.env.DEV) {
     MISTRAL: OPENROUTER_API_KEYS.MISTRAL ? '✅' : '❌',
     STEPFUN: OPENROUTER_API_KEYS.STEPFUN ? '✅' : '❌'
   });
-  console.log('☁️ Ollama Cloud API Key:', OLLAMA_CLOUD_API_KEY ? '✅' : '❌');
 }
 
 // ==================== دالة تحويل الملف إلى Base64 ====================
@@ -113,7 +111,6 @@ const fileToBase64 = (file) => {
       reject(error);
     };
   });
-  console.log('☁️ Ollama Cloud API Key:', OLLAMA_CLOUD_API_KEY ? '✅' : '❌');
 };
 
 // ==================== دالة رفع الملف إلى خادم مؤقت ====================
@@ -346,15 +343,6 @@ ${BUSINESS_INTELLIGENCE_FRAMEWORK}`
   const invokeOllamaCloud = async (model, prompt, files = []) => {
     const modelName = OLLAMA_MODELS[model];
 
-    if (!OLLAMA_CLOUD_API_KEY) {
-      return {
-        type: 'text',
-        content: language === 'ar'
-          ? `❌ مفتاح Ollama Cloud غير موجود للنموذج ${model}. الرجاء إضافة VITE_OLLAMA_CLOUD_API_KEY في ملف .env`
-          : `❌ Ollama Cloud API key not found for model ${model}. Please add VITE_OLLAMA_CLOUD_API_KEY in .env file`
-      };
-    }
-
     const userContent = [{ type: 'text', text: prompt }];
 
     for (const file of files) {
@@ -554,6 +542,63 @@ User design request:
 ${userPrompt}
 
 Generate high-quality visuals suitable for social media, banners, logos, and ad creatives.`;
+  };
+
+  const extractUrls = (text = '') => {
+    const matches = text.match(/https?:\/\/[^\s)]+/g) || [];
+    return [...new Set(matches)].slice(0, 5);
+  };
+
+  const buildWebContext = async (promptText) => {
+    try {
+      const profileText = [
+        user?.business_name,
+        user?.industry,
+        user?.website,
+        user?.social_platforms,
+        user?.competitors
+      ].filter(Boolean).join(' ');
+
+      const query = `${promptText} ${profileText}`.slice(0, 500);
+      const urls = extractUrls(`${promptText} ${user?.website || ''} ${user?.social_platforms || ''}`);
+      const response = await fetch(`${window.location.origin}/api/research`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, urls })
+      });
+
+      if (!response.ok) {
+        return '';
+      }
+
+      const data = await response.json();
+      const sourcesText = (data.sources || []).slice(0, 8).map((item, idx) => (
+        `${idx + 1}. ${item.title || 'Untitled'}
+URL: ${item.url || 'N/A'}
+Summary: ${item.content || 'N/A'}`
+      )).join('
+
+');
+
+      const pagesText = (data.pages || []).slice(0, 5).map((item, idx) => (
+        `${idx + 1}. URL: ${item.url}
+Extracted content: ${(item.content || '').slice(0, 1000)}`
+      )).join('
+
+');
+
+      if (!sourcesText && !pagesText) return '';
+
+      return `
+Live Web Research Context:
+${sourcesText}
+
+Linked Pages Extract:
+${pagesText}`;
+    } catch (error) {
+      console.error('Research context fetch error:', error);
+      return '';
+    }
   };
 
   const pollAIHordeResult = async (requestId) => {
@@ -809,10 +854,12 @@ Goals & Challenges:
 Social Media: ${user.social_platforms || 'Not provided'}
 ` : 'No profile information available.';
 
+      const webContext = await buildWebContext(content);
+
       // ✅ بناء البرومبت الكامل مع بيانات البروفايل
       const fullPrompt = `You are an AI business consultant. You have access to the user's profile information below.
 
-${profileContext}
+${profileContext}${webContext}
 
 Previous conversation:
 ${messages.map(m => `${m.role}: ${m.content}`).join('\n')}
