@@ -678,7 +678,7 @@ export default function Home() {
           </div>
 
           <div className="pt-8 border-t border-slate-200 dark:border-slate-800 text-center text-slate-500 dark:text-slate-400 text-sm">
-            <p>© {new Date().getFullYear()} ChatBAI. {language === 'ar' ? 'جميع الحقوق محفوظة' : 'All rights reserved'}.</p>
+            <p>© {new Date().getFullYear()} ChatBAI By Eng. Anton Hanna & Eng. Yassa Hanna. {language === 'ar' ? 'جميع الحقوق محفوظة' : 'All rights reserved'}.</p>
           </div>
         </div>
       </footer>
