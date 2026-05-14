@@ -1,7 +1,7 @@
 import React from 'react';
+import { logout as firebaseLogout } from '@/lib/firebase';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
-import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -15,13 +15,9 @@ export default function Settings() {
   const { t, language, changeLanguage, isRtl } = useLanguage();
   const { darkMode, toggleDarkMode } = useTheme();
 
-  const handleLogout = async () => {
-    await base44.entities.ActivityLog.create({
-      user_email: (await base44.auth.me()).email,
-      action: 'logout',
-      details: 'User logged out'
-    });
-    base44.auth.logout();
+  const handleLogout = () => {
+    firebaseLogout();
+    navigate(createPageUrl('SignIn'));
   };
 
   return (
